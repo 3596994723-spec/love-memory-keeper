@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>恋爱记忆记录器</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- 百度地图API -->
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=ZKHGs4lIBlM6AJf3JnRDF2rStIzxGKj1"></script>
+    <script type="text/javascript">
+        // 百度地图API加载状态检测
+        window.baiduMapLoaded = false;
+        window.onBMapLoad = function() {
+            window.baiduMapLoaded = true;
+            console.log('百度地图API加载成功');
+        };
+        // 检查API是否加载
+        setTimeout(function() {
+            if (!window.baiduMapLoaded && !window.BMap) {
+                console.warn('百度地图API加载失败');
+            }
+        }, 3000);
+    </script>
+</head>
+<body>
+    <!-- 密码保护遮罩 -->
+    <div id="password-overlay" class="password-overlay">
+        <div class="password-box">
+            <h2>🔐 请输入密码</h2>
+            <p>这是我们的私密空间</p>
+            <input type="password" id="password-input" placeholder="请输入密码">
+            <button id="password-submit" class="btn">进入</button>
+            <p class="password-hint">首次使用请设置密码</p>
+        </div>
+    </div>
+
+    <!-- 背景音乐控制 -->
+    <div id="music-control" class="music-control">
+        <button id="music-toggle" class="music-btn" title="背景音乐">🎵</button>
+    </div>
+
+    <!-- 主题切换控制 -->
+    <div id="theme-control" class="theme-control">
+        <button id="theme-toggle" class="theme-btn" title="切换主题">🎨</button>
+        <div id="theme-panel" class="theme-panel" style="display: none;">
+            <h4>选择主题</h4>
+            <div class="theme-options">
+                <button class="theme-option" data-theme="pink">🌸 粉色</button>
+                <button class="theme-option" data-theme="blue">💙 蓝色</button>
+                <button class="theme-option" data-theme="purple">💜 紫色</button>
+                <button class="theme-option" data-theme="green">💚 绿色</button>
+                <button class="theme-option" data-theme="dark">🌙 暗黑</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>恋爱记忆记录器</h1>
+            <p>记录我们的美好时光</p>
+        </header>
+        
+        <!-- 主页面 -->
+        <main id="home-page" class="page active">
+            <!-- 恋爱计时器 -->
+            <div class="love-timer-card">
+                <div class="timer-header">
+                    <span class="timer-icon">💕</span>
+                    <h3>我们在一起</h3>
+                </div>
+                <div class="timer-display" id="love-timer">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="timer-days">0</span>
+                        <span class="timer-label">天</span>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="timer-hours">0</span>
+                        <span class="timer-label">时</span>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="timer-minutes">0</span>
+                        <span class="timer-label">分</span>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="timer-seconds">0</span>
+                        <span class="timer-label">秒</span>
+                    </div>
+                </div>
+                <button class="btn btn-small" id="set-start-date">设置开始日期</button>
+            </div>
+
+            <!-- 纪念日倒计时 -->
+            <div class="countdown-section" id="countdown-section">
+                <h3>📅 即将到来的纪念日</h3>
+                <div id="countdown-list" class="countdown-list"></div>
+            </div>
+
+            <!-- 随机回忆按钮 -->
+            <div class="random-memory-section">
+                <button class="btn btn-random" id="random-memory-btn">🎲 随机回忆</button>
+            </div>
+
+            <!-- 卡片导航 -->
+            <div class="cards-container">
+                <div class="card" data-page="add-memory">
+                    <div class="card-icon">✨</div>
+                    <h3>添加记忆</h3>
+                    <p>记录新的恋爱记忆</p>
+                </div>
+                
+                <div class="card" data-page="photo-wall">
+                    <div class="card-icon">📸</div>
+                    <h3>照片墙</h3>
+                    <p>浏览我们的照片</p>
+                </div>
+                
+                <div class="card" data-page="wishlist">
+                    <div class="card-icon">📝</div>
+                    <h3>愿望清单</h3>
+                    <p>想一起做的事</p>
+                </div>
+                
+                <div class="card" data-page="mood">
+                    <div class="card-icon">💭</div>
+                    <h3>心情打卡</h3>
+                    <p>记录每日心情</p>
+                </div>
+                
+                <div class="card" data-page="calendar">
+                    <div class="card-icon">📅</div>
+                    <h3>记忆日历</h3>
+                    <p>查看日历和记忆标记</p>
+                </div>
+                
+                <div class="card" data-page="map">
+                    <div class="card-icon">🗺️</div>
+                    <h3>记忆地图</h3>
+                    <p>查看我们去过的地方</p>
+                </div>
+                
+                <div class="card" data-page="anniversary">
+                    <div class="card-icon">💕</div>
+                    <h3>纪念日管理</h3>
+                    <p>添加和管理重要纪念日</p>
+                </div>
+                
+                <div class="card" data-page="ai-assistant">
+                    <div class="card-icon">🤖</div>
+                    <h3>智能助手</h3>
+                    <p>分析甜蜜瞬间</p>
+                </div>
+                
+                <div class="card" data-page="memories">
+                    <div class="card-icon">💝</div>
+                    <h3>我的记忆</h3>
+                    <p>查看所有记忆记录</p>
+                </div>
+                
+                <div class="card" data-page="messages">
+                    <div class="card-icon">💌</div>
+                    <h3>甜蜜留言</h3>
+                    <p>互相留言表达爱意</p>
+                </div>
+                
+                <div class="card" data-page="settings">
+                    <div class="card-icon">⚙️</div>
+                    <h3>设置</h3>
+                    <p>主题、密码、导出</p>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 照片墙页面 -->
+        <section id="photo-wall-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>照片墙</h2>
+            <p class="page-hint">我们的美好瞬间</p>
+            <div id="photo-wall-grid" class="photo-wall-grid"></div>
+        </section>
+        
+        <!-- 愿望清单页面 -->
+        <section id="wishlist-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>愿望清单</h2>
+            <p class="page-hint">想一起做的事情</p>
+            <form id="wishlist-form">
+                <div class="form-group">
+                    <input type="text" id="wish-input" placeholder="添加一个愿望..." maxlength="100">
+                    <button type="submit" class="btn">添加</button>
+                </div>
+            </form>
+            <div class="wishlist-stats">
+                <span>已完成: <strong id="wish-completed">0</strong></span>
+                <span>进行中: <strong id="wish-pending">0</strong></span>
+            </div>
+            <div id="wishlist-container" class="wishlist-container"></div>
+        </section>
+        
+        <!-- 心情打卡页面 -->
+        <section id="mood-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>心情打卡</h2>
+            <p class="page-hint">记录每天的心情</p>
+            <div class="mood-today">
+                <h3>今天的心情</h3>
+                <div class="mood-options">
+                    <button class="mood-btn" data-mood="happy" title="开心">😊</button>
+                    <button class="mood-btn" data-mood="love" title="甜蜜">🥰</button>
+                    <button class="mood-btn" data-mood="excited" title="兴奋">🤩</button>
+                    <button class="mood-btn" data-mood="calm" title="平静">😌</button>
+                    <button class="mood-btn" data-mood="sad" title="难过">😢</button>
+                    <button class="mood-btn" data-mood="angry" title="生气">😤</button>
+                </div>
+                <textarea id="mood-note" placeholder="写点什么..." maxlength="200"></textarea>
+                <button class="btn" id="save-mood-btn">保存今日心情</button>
+            </div>
+            <div class="mood-history">
+                <h3>心情记录</h3>
+                <div id="mood-chart" class="mood-chart"></div>
+                <div id="mood-list" class="mood-list"></div>
+            </div>
+        </section>
+        
+        <!-- 记忆日历页面 -->
+        <section id="calendar-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>记忆日历</h2>
+            <div class="calendar-controls">
+                <div class="month-controls">
+                    <button id="prev-month" class="btn">◀</button>
+                    <h3 id="current-month" class="clickable-month" title="点击修改年份"></h3>
+                    <button id="next-month" class="btn">▶</button>
+                </div>
+            </div>
+            <div id="year-selector" class="year-selector" style="display: none;">
+                <input type="number" id="year-input" min="1900" max="2100">
+                <button id="year-confirm" class="btn">确定</button>
+            </div>
+            <div id="calendar" class="calendar"></div>
+        </section>
+        
+        <!-- 记忆地图页面 -->
+        <section id="map-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>记忆地图</h2>
+            <p class="map-hint">我们去过的地方都会在这里显示</p>
+            <div id="memory-map" class="memory-map"></div>
+        </section>
+        
+        <!-- 纪念日管理页面 -->
+        <section id="anniversary-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2 id="anniversary-form-title">纪念日管理</h2>
+            <form id="anniversary-form">
+                <input type="hidden" id="anniversary-id">
+                <div class="form-group">
+                    <label for="anniversary-name">纪念日名称：</label>
+                    <input type="text" id="anniversary-name" placeholder="例如：第一次约会、确定关系">
+                </div>
+                <div class="form-group">
+                    <label for="anniversary-date">日期：</label>
+                    <input type="date" id="anniversary-date">
+                </div>
+                <div class="form-group">
+                    <label for="anniversary-description">描述：</label>
+                    <textarea id="anniversary-description" rows="2" placeholder="添加一些描述..."></textarea>
+                </div>
+                <button type="submit" class="btn" id="anniversary-submit-btn">添加纪念日</button>
+            </form>
+            <div id="anniversaries-list" class="anniversaries-list"></div>
+        </section>
+        
+        <!-- 添加记忆页面 -->
+        <section id="add-memory-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2 id="memory-form-title">添加新记忆</h2>
+            <form id="memory-form">
+                <input type="hidden" id="memory-id">
+                <div class="form-group">
+                    <label for="memory-type">记忆类型：</label>
+                    <select id="memory-type">
+                        <option value="date">约会</option>
+                        <option value="milestone">里程碑</option>
+                        <option value="story">故事</option>
+                        <option value="travel">旅行</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="memory-content">记忆内容：</label>
+                    <div class="textarea-container">
+                        <textarea id="memory-content" rows="4" placeholder="请描述你的记忆..."></textarea>
+                        <button type="button" id="voice-input-btn" class="voice-btn" title="语音输入">🎤</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>地点（可多选）：</label>
+                    <div class="location-input-container">
+                        <input type="text" id="memory-location" placeholder="输入地点名称">
+                        <button type="button" id="search-location-btn" class="btn">搜索</button>
+                    </div>
+                    <div id="selected-locations" class="selected-locations"></div>
+                </div>
+                <div class="form-group date-form-group">
+                    <label>日期选择：</label>
+                    <div class="date-range-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="date-range-toggle">
+                            <span>时间段（如旅行）</span>
+                        </label>
+                    </div>
+                    <div id="single-date-container" class="date-container">
+                        <input type="date" id="memory-date">
+                    </div>
+                    <div id="date-range-container" class="date-container" style="display: none;">
+                        <div class="date-range-inputs">
+                            <input type="date" id="memory-start-date" placeholder="开始日期">
+                            <span class="date-separator">至</span>
+                            <input type="date" id="memory-end-date" placeholder="结束日期">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group" id="photo-upload-container">
+                    <label for="photo-upload">上传照片（可选）：</label>
+                    <input type="file" id="photo-upload" accept="image/*" multiple>
+                </div>
+                <button type="submit" class="btn" id="memory-submit-btn">保存记忆</button>
+            </form>
+        </section>
+        
+        <!-- 智能助手页面 -->
+        <section id="ai-assistant-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>智能助手</h2>
+            <p>让我帮你分析你们的甜蜜瞬间</p>
+            <div class="ai-quick-actions">
+                <button class="quick-action-btn" data-query="分析我们最甜蜜的瞬间">💕 最甜蜜瞬间</button>
+                <button class="quick-action-btn" data-query="总结我们的恋爱历程">📝 恋爱历程</button>
+                <button class="quick-action-btn" data-query="推荐我们的约会地点">📍 约会推荐</button>
+                <button class="quick-action-btn" data-query="分析我们的共同爱好">❤️ 共同爱好</button>
+            </div>
+            <div class="ai-input">
+                <input type="text" id="ai-query" placeholder="问我任何关于你们记忆的问题...">
+                <button id="ai-submit" class="btn">发送</button>
+            </div>
+            <div id="ai-response" class="ai-response">
+                <p>你好！我是你们的恋爱记忆助手。我可以帮你分析甜蜜瞬间、总结恋爱历程、推荐约会地点等。点击上方的快捷按钮或直接输入你的问题吧！</p>
+            </div>
+        </section>
+        
+        <!-- 我的记忆页面 -->
+        <section id="memories-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>我的记忆</h2>
+            <div id="memories-list" class="memories-list"></div>
+        </section>
+        
+        <!-- 甜蜜留言页面 -->
+        <section id="messages-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>甜蜜留言</h2>
+            <p class="message-hint">在这里给对方留言，表达你的爱意</p>
+            <form id="message-form">
+                <div class="form-group">
+                    <label for="message-content">留言内容：</label>
+                    <textarea id="message-content" rows="3" placeholder="写下你想对TA说的话..." maxlength="500"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="message-mood">心情：</label>
+                    <select id="message-mood">
+                        <option value="love">❤️ 爱你</option>
+                        <option value="miss">💕 想你</option>
+                        <option value="happy">😊 开心</option>
+                        <option value="thanks">🙏 感谢</option>
+                        <option value="sorry">😔 抱歉</option>
+                        <option value="other">💭 其他</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">发送留言</button>
+            </form>
+            <div id="messages-list" class="messages-list"></div>
+        </section>
+        
+        <!-- 设置页面 -->
+        <section id="settings-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>设置</h2>
+            
+            <div class="settings-section">
+                <h3>🔐 密码设置</h3>
+                <div class="form-group">
+                    <label for="new-password">新密码：</label>
+                    <input type="password" id="new-password" placeholder="留空则不修改">
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">确认密码：</label>
+                    <input type="password" id="confirm-password" placeholder="再次输入新密码">
+                </div>
+                <button class="btn" id="save-password-btn">保存密码</button>
+            </div>
+            
+            <div class="settings-section">
+                <h3>📅 恋爱开始日期</h3>
+                <div class="form-group">
+                    <input type="date" id="love-start-date">
+                </div>
+                <button class="btn" id="save-start-date-btn">保存日期</button>
+            </div>
+            
+            <div class="settings-section">
+                <h3>📤 数据导出</h3>
+                <p class="settings-hint">导出所有数据为JSON文件</p>
+                <button class="btn" id="export-data-btn">导出数据</button>
+            </div>
+            
+            <div class="settings-section">
+                <h3>📥 数据导入</h3>
+                <p class="settings-hint">从JSON文件导入数据</p>
+                <input type="file" id="import-data-input" accept=".json">
+            </div>
+            
+            <div class="settings-section">
+                <h3>🗺️ 地图状态</h3>
+                <p class="settings-hint">检查百度地图API连接状态</p>
+                <button class="btn" id="check-map-btn">检查地图状态</button>
+                <div id="map-status" class="map-status" style="margin-top:10px;"></div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>🗑️ 数据管理</h3>
+                <p class="settings-hint">清除所有数据（不可恢复）</p>
+                <button class="btn btn-danger" id="clear-data-btn">清除所有数据</button>
+            </div>
+        </section>
+        
+        <footer>
+            <p>© 2026 恋爱记忆记录器</p>
+        </footer>
+    </div>
+    
+    <!-- 随机回忆弹窗 -->
+    <div id="random-memory-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" id="close-random-modal">×</button>
+            <h3>🎲 随机回忆</h3>
+            <div id="random-memory-content"></div>
+            <button class="btn" id="another-random-btn">再来一个</button>
+        </div>
+    </div>
+    
+    <!-- 照片查看弹窗 -->
+    <div id="photo-modal" class="modal" style="display: none;">
+        <div class="modal-content photo-modal-content">
+            <button class="modal-close" id="close-photo-modal">×</button>
+            <img id="photo-modal-img" src="" alt="照片">
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
