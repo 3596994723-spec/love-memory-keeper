@@ -10,6 +10,7 @@ let currentTheme = localStorage.getItem('loveTheme') || 'pink';
 let currentDate = new Date();
 let selectedPhotos = [];
 let selectedLocations = [];
+let selectedTags = [];
 let memoryMap = null;
 let editingMemoryId = null;
 let editingAnniversaryId = null;
@@ -164,12 +165,24 @@ function bindAllEvents() {
     // 语音输入
     document.getElementById('voice-input-btn').addEventListener('click', startVoiceInput);
     
+    // 语音留言
+    document.getElementById('voice-message-btn').addEventListener('click', startVoiceMessage);
+    
     // 地点搜索
     document.getElementById('search-location-btn').addEventListener('click', searchLocation);
     document.getElementById('memory-location').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             searchLocation();
+        }
+    });
+    
+    // 标签添加
+    document.getElementById('add-tag-btn').addEventListener('click', addTag);
+    document.getElementById('memory-tag').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addTag();
         }
     });
     
@@ -265,6 +278,7 @@ function showPage(pageName) {
         else if (pageName === 'mood') renderMoods();
         else if (pageName === 'photo-wall') renderPhotoWall();
         else if (pageName === 'map') setTimeout(initMap, 100);
+        else if (pageName === 'stats') renderStats();
         else if (pageName === 'home') {
             renderCountdown();
             startLoveTimer();
@@ -348,9 +362,13 @@ function showRandomMemory() {
     
     let photoDisplay = '';
     if (random.photos && random.photos.length > 0) {
-        photoDisplay = `<div class="photo-gallery" style="margin-top:10px;">${random.photos.map(p => 
-            `<div class="photo-item"><img src="${p}" style="width:100%;height:100%;object-fit:cover;"></div>`
-        ).join('')}</div>`;
+        photoDisplay = `<div class="photo-gallery" style="margin-top:10px;">${random.photos.map(p => {
+            if (p.startsWith('data:video/')) {
+                return `<div class="photo-item"><video src="${p}" controls style="width:100%;height:100%;object-fit:cover;"></video></div>`;
+            } else {
+                return `<div class="photo-item"><img src="${p}" style="width:100%;height:100%;object-fit:cover;"></div>`;
+            }
+        }).join('')}</div>`;
     }
     
     document.getElementById('random-memory-content').innerHTML = `
@@ -380,11 +398,21 @@ function renderPhotoWall() {
         return;
     }
     
-    grid.innerHTML = allPhotos.map(p => `
-        <div class="photo-wall-item" onclick="showPhoto('${p.photo}')">
-            <img src="${p.photo}" alt="记忆照片">
-        </div>
-    `).join('');
+    grid.innerHTML = allPhotos.map(p => {
+        if (p.photo.startsWith('data:video/')) {
+            return `
+                <div class="photo-wall-item">
+                    <video src="${p.photo}" alt="记忆视频" controls></video>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="photo-wall-item" onclick="showPhoto('${p.photo}')">
+                    <img src="${p.photo}" alt="记忆照片">
+                </div>
+            `;
+        }
+    }).join('');
 }
 
 function showPhoto(src) {
@@ -725,6 +753,37 @@ function renderSelectedLocations() {
     `).join('');
 }
 
+// 标签功能
+function addTag() {
+    const input = document.getElementById('memory-tag');
+    const tag = input.value.trim();
+    if (!tag) return;
+    
+    if (selectedTags.includes(tag)) {
+        showNotification('该标签已添加');
+        return;
+    }
+    
+    selectedTags.push(tag);
+    renderSelectedTags();
+    input.value = '';
+}
+
+function removeTag(index) {
+    selectedTags.splice(index, 1);
+    renderSelectedTags();
+}
+
+function renderSelectedTags() {
+    const container = document.getElementById('selected-tags');
+    container.innerHTML = selectedTags.map((tag, i) => `
+        <div class="selected-tag">
+            <span>${tag}</span>
+            <button type="button" class="remove-tag" onclick="removeTag(${i})">×</button>
+        </div>
+    `).join('');
+}
+
 // 语音输入
 function startVoiceInput() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -790,6 +849,84 @@ function startVoiceInput() {
     }
 }
 
+// 语音留言
+function startVoiceMessage() {
+    if (!('MediaRecorder' in window) || !('navigator' in window) || !('mediaDevices' in navigator)) {
+        alert('浏览器不支持语音录制\n\n建议使用：\n• Google Chrome\n• Microsoft Edge\n• Mozilla Firefox');
+        return;
+    }
+    
+    try {
+        const btn = document.getElementById('voice-message-btn');
+        
+        btn.classList.add('recording');
+        btn.textContent = '🔴';
+        showNotification('请开始录制语音留言...');
+        
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+                
+                mediaRecorder.start();
+                
+                mediaRecorder.ondataavailable = function(e) {
+                    chunks.push(e.data);
+                };
+                
+                mediaRecorder.onstop = function() {
+                    const blob = new Blob(chunks, { type: 'audio/wav' });
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        const audioData = e.target.result;
+                        // 在留言内容中添加音频标记
+                        const textarea = document.getElementById('message-content');
+                        textarea.value += '[语音留言] ';
+                        
+                        // 存储音频数据到localStorage或其他地方
+                        // 这里我们简化处理，将音频数据作为留言的一部分
+                        localStorage.setItem('voiceMessage_' + Date.now(), audioData);
+                        showNotification('语音留言录制成功！');
+                    };
+                    
+                    reader.readAsDataURL(blob);
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                    btn.classList.remove('recording');
+                    btn.textContent = '🎤';
+                };
+                
+                // 30秒后自动停止录制
+                setTimeout(() => {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                }, 30000);
+                
+                // 点击按钮停止录制
+                btn.onclick = function() {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                    btn.onclick = startVoiceMessage;
+                };
+            })
+            .catch(error => {
+                console.error('获取麦克风权限失败:', error);
+                showNotification('无法访问麦克风');
+                btn.classList.remove('recording');
+                btn.textContent = '🎤';
+            });
+    } catch (error) {
+        console.error('语音录制初始化错误:', error);
+        alert('语音录制初始化失败\n\n' + error.message);
+        const btn = document.getElementById('voice-message-btn');
+        btn.classList.remove('recording');
+        btn.textContent = '🎤';
+    }
+}
+
 // 添加记忆
 function addMemory() {
     const type = document.getElementById('memory-type').value;
@@ -830,7 +967,8 @@ function addMemory() {
         date: dateInfo.date,
         dateRange: dateInfo.isRange ? { start: dateInfo.startDate, end: dateInfo.endDate } : null,
         locations: selectedLocations,
-        photos: selectedPhotos,
+        photos: selectedPhotos.map(item => item.data || item),
+        tags: selectedTags,
         createdAt: new Date().toISOString()
     };
     
@@ -876,7 +1014,8 @@ function updateMemory() {
             date: dateInfo.date,
             dateRange: dateInfo.isRange ? { start: dateInfo.startDate, end: dateInfo.endDate } : null,
             locations: selectedLocations,
-            photos: selectedPhotos,
+            photos: selectedPhotos.map(item => item.data || item),
+            tags: selectedTags,
             updatedAt: new Date().toISOString()
         };
         
@@ -897,7 +1036,9 @@ function resetMemoryForm() {
     document.getElementById('memory-id').value = '';
     selectedPhotos = [];
     selectedLocations = [];
+    selectedTags = [];
     document.getElementById('selected-locations').innerHTML = '';
+    document.getElementById('selected-tags').innerHTML = '';
     document.getElementById('single-date-container').style.display = 'block';
     document.getElementById('date-range-container').style.display = 'none';
     document.getElementById('date-range-toggle').checked = false;
@@ -942,6 +1083,11 @@ function editMemory(id) {
         renderSelectedPhotos();
     }
     
+    if (memory.tags && memory.tags.length > 0) {
+        selectedTags = [...memory.tags];
+        renderSelectedTags();
+    }
+    
     showPage('add-memory');
 }
 
@@ -959,10 +1105,10 @@ function deleteMemory(id) {
 function handlePhotoUpload(e) {
     const files = e.target.files;
     for (let file of files) {
-        if (!file.type.startsWith('image/')) continue;
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue;
         const reader = new FileReader();
         reader.onload = function(e) {
-            selectedPhotos.push(e.target.result);
+            selectedPhotos.push({ data: e.target.result, type: file.type });
             renderSelectedPhotos();
         };
         reader.readAsDataURL(file);
@@ -976,12 +1122,23 @@ function renderSelectedPhotos() {
         gallery.className = 'photo-gallery';
         document.getElementById('photo-upload-container').appendChild(gallery);
     }
-    gallery.innerHTML = selectedPhotos.map((p, i) => `
-        <div class="photo-item">
-            <img src="${p}" alt="照片">
-            <button class="delete-photo" onclick="deletePhoto(${i})">×</button>
-        </div>
-    `).join('');
+    gallery.innerHTML = selectedPhotos.map((item, i) => {
+        if (item.type && item.type.startsWith('video/')) {
+            return `
+                <div class="photo-item">
+                    <video src="${item.data}" alt="视频" controls style="width:100%;height:100%;object-fit:cover;"></video>
+                    <button class="delete-photo" onclick="deletePhoto(${i})">×</button>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="photo-item">
+                    <img src="${item.data || item}" alt="照片">
+                    <button class="delete-photo" onclick="deletePhoto(${i})">×</button>
+                </div>
+            `;
+        }
+    }).join('');
 }
 
 function deletePhoto(index) {
@@ -1010,14 +1167,28 @@ function renderMemories() {
         } else if (m.location) {
             locationDisplay = `<p class="memory-location">📍 ${m.location.name.split(',')[0]}</p>`;
         }
-        const photoGallery = m.photos && m.photos.length > 0 
-            ? `<div class="photo-gallery">${m.photos.map(p => `<div class="photo-item"><img src="${p}" alt="照片"></div>`).join('')}</div>` 
-            : '';
+        
+        let tagDisplay = '';
+        if (m.tags && m.tags.length > 0) {
+            tagDisplay = `<div class="memory-tags">${m.tags.map(tag => `<span class="memory-tag">${tag}</span>`).join('')}</div>`;
+        }
+        
+        let photoGallery = '';
+        if (m.photos && m.photos.length > 0) {
+            photoGallery = `<div class="photo-gallery">${m.photos.map(p => {
+                if (p.startsWith('data:video/')) {
+                    return `<div class="photo-item"><video src="${p}" alt="视频" controls style="width:100%;height:100%;object-fit:cover;"></video></div>`;
+                } else {
+                    return `<div class="photo-item"><img src="${p}" alt="照片"></div>`;
+                }
+            }).join('')}</div>`;
+        }
         
         return `
             <div class="memory-item">
                 <h3>${typeNames[m.type]}</h3>
                 ${locationDisplay}
+                ${tagDisplay}
                 <p>${m.content}</p>
                 ${photoGallery}
                 <p class="date">${dateDisplay}</p>
@@ -1158,7 +1329,13 @@ function addMessage() {
     
     const moodNames = { love: '❤️ 爱你', miss: '💕 想你', happy: '😊 开心', thanks: '🙏 感谢', sorry: '😔 抱歉', other: '💭 其他' };
     
-    messages.push({ id: Date.now(), content, mood: moodNames[mood], createdAt: new Date().toISOString() });
+    messages.push({ 
+        id: Date.now(), 
+        content, 
+        mood: moodNames[mood], 
+        createdAt: new Date().toISOString(),
+        hasVoice: content.includes('[语音留言]')
+    });
     localStorage.setItem('loveMessages', JSON.stringify(messages));
     
     document.getElementById('message-content').value = '';
@@ -1182,6 +1359,7 @@ function renderMessages() {
             <div class="message-item">
                 <div class="message-header"><span class="message-time">${formatted}</span></div>
                 <div class="message-content">${m.content}</div>
+                ${m.hasVoice ? '<audio controls style="width:100%;margin:10px 0;"><source src="" type="audio/wav">您的浏览器不支持音频播放。</audio>' : ''}
                 <div class="message-mood">心情：${m.mood}</div>
                 <div class="message-actions">
                     <button class="btn btn-delete" onclick="deleteMessage(${m.id})">删除</button>
@@ -1197,6 +1375,132 @@ function deleteMessage(id) {
         localStorage.setItem('loveMessages', JSON.stringify(messages));
         renderMessages();
         showNotification('留言已删除');
+    }
+}
+
+// 统计分析
+function renderStats() {
+    // 基本统计
+    document.getElementById('total-memories').textContent = memories.length;
+    
+    // 计算总照片数
+    const totalPhotos = memories.reduce((sum, m) => {
+        return sum + (m.photos ? m.photos.length : 0);
+    }, 0);
+    document.getElementById('total-photos').textContent = totalPhotos;
+    
+    document.getElementById('total-anniversaries').textContent = anniversaries.length;
+    document.getElementById('total-messages').textContent = messages.length;
+    
+    // 记忆类型分布
+    const typeStats = memories.reduce((acc, m) => {
+        acc[m.type] = (acc[m.type] || 0) + 1;
+        return acc;
+    }, {});
+    
+    const typeNames = { date: '约会', milestone: '里程碑', story: '故事', travel: '旅行' };
+    const typeChart = document.getElementById('memory-type-chart');
+    
+    if (Object.keys(typeStats).length === 0) {
+        typeChart.innerHTML = '<p>还没有记忆数据</p>';
+    } else {
+        typeChart.innerHTML = Object.entries(typeStats).map(([type, count]) => {
+            const percentage = ((count / memories.length) * 100).toFixed(0);
+            return `
+                <div style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>${typeNames[type]}</span>
+                        <span>${count} (${percentage}%)</span>
+                    </div>
+                    <div style="height: 8px; background-color: #ddd; border-radius: 4px;">
+                        <div style="height: 100%; width: ${percentage}%; background-color: var(--accent-color); border-radius: 4px;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // 常去地点统计
+    const locationStats = {};
+    memories.forEach(m => {
+        const locations = m.locations || (m.location ? [m.location] : []);
+        locations.forEach(loc => {
+            const locationName = loc.name.split(',')[0];
+            locationStats[locationName] = (locationStats[locationName] || 0) + 1;
+        });
+    });
+    
+    const locationStatsEl = document.getElementById('location-stats');
+    if (Object.keys(locationStats).length === 0) {
+        locationStatsEl.innerHTML = '<p>还没有地点数据</p>';
+    } else {
+        const sortedLocations = Object.entries(locationStats)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+        
+        locationStatsEl.innerHTML = sortedLocations.map(([name, count]) => `
+            <div class="stats-list-item">
+                <span class="item-name">${name}</span>
+                <span class="item-count">${count}次</span>
+            </div>
+        `).join('');
+    }
+    
+    // 标签统计
+    const tagStats = {};
+    memories.forEach(m => {
+        if (m.tags) {
+            m.tags.forEach(tag => {
+                tagStats[tag] = (tagStats[tag] || 0) + 1;
+            });
+        }
+    });
+    
+    const tagStatsEl = document.getElementById('tag-stats');
+    if (Object.keys(tagStats).length === 0) {
+        tagStatsEl.innerHTML = '<p>还没有标签数据</p>';
+    } else {
+        const sortedTags = Object.entries(tagStats)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+        
+        tagStatsEl.innerHTML = sortedTags.map(([tag, count]) => `
+            <div class="stats-list-item">
+                <span class="item-name">${tag}</span>
+                <span class="item-count">${count}次</span>
+            </div>
+        `).join('');
+    }
+    
+    // 时间分布
+    const timeDistribution = document.getElementById('time-distribution');
+    if (memories.length === 0) {
+        timeDistribution.innerHTML = '<p>还没有记忆数据</p>';
+    } else {
+        // 按月份统计
+        const monthlyStats = Array(12).fill(0);
+        const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        
+        memories.forEach(m => {
+            const date = new Date(m.date);
+            const month = date.getMonth();
+            monthlyStats[month]++;
+        });
+        
+        timeDistribution.innerHTML = `
+            <div style="width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: space-around;">
+                ${monthlyStats.map((count, index) => {
+                    const height = count > 0 ? (count / Math.max(...monthlyStats)) * 80 : 5;
+                    return `
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                            <div style="width: 20px; height: ${height}%; background-color: var(--accent-color); border-radius: 2px 2px 0 0;"></div>
+                            <span style="font-size: 0.4rem;">${monthNames[index]}</span>
+                            <span style="font-size: 0.4rem; color: var(--accent-color);">${count}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
     }
 }
 

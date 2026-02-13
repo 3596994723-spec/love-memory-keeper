@@ -162,6 +162,11 @@
                     <p>互相留言表达爱意</p>
                 </div>
                 
+                <div class="card" data-page="stats">
+                    <div class="card-icon">📊</div>
+                    <h3>统计分析</h3>
+                    <p>记忆数据统计分析</p>
+                </div>
                 <div class="card" data-page="settings">
                     <div class="card-icon">⚙️</div>
                     <h3>设置</h3>
@@ -320,8 +325,16 @@
                     </div>
                 </div>
                 <div class="form-group" id="photo-upload-container">
-                    <label for="photo-upload">上传照片（可选）：</label>
-                    <input type="file" id="photo-upload" accept="image/*" multiple>
+                    <label for="photo-upload">上传照片/视频（可选）：</label>
+                    <input type="file" id="photo-upload" accept="image/*,video/*" multiple>
+                </div>
+                <div class="form-group">
+                    <label>标签（可多选）：</label>
+                    <div class="tag-input-container">
+                        <input type="text" id="memory-tag" placeholder="输入标签名称">
+                        <button type="button" id="add-tag-btn" class="btn">添加</button>
+                    </div>
+                    <div id="selected-tags" class="selected-tags"></div>
                 </div>
                 <button type="submit" class="btn" id="memory-submit-btn">保存记忆</button>
             </form>
@@ -362,7 +375,10 @@
             <form id="message-form">
                 <div class="form-group">
                     <label for="message-content">留言内容：</label>
-                    <textarea id="message-content" rows="3" placeholder="写下你想对TA说的话..." maxlength="500"></textarea>
+                    <div class="textarea-container">
+                        <textarea id="message-content" rows="3" placeholder="写下你想对TA说的话..." maxlength="500"></textarea>
+                        <button type="button" id="voice-message-btn" class="voice-btn" title="语音留言">🎤</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="message-mood">心情：</label>
@@ -378,6 +394,62 @@
                 <button type="submit" class="btn">发送留言</button>
             </form>
             <div id="messages-list" class="messages-list"></div>
+        </section>
+        
+        <!-- 统计分析页面 -->
+        <section id="stats-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>统计分析</h2>
+            <p class="page-hint">探索你们的恋爱数据</p>
+            
+            <div class="stats-container">
+                <!-- 基本统计 -->
+                <div class="stats-card">
+                    <h3>📊 基本统计</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number" id="total-memories">0</div>
+                            <div class="stat-label">总记忆数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="total-photos">0</div>
+                            <div class="stat-label">总照片数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="total-anniversaries">0</div>
+                            <div class="stat-label">纪念日数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="total-messages">0</div>
+                            <div class="stat-label">留言数</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 记忆类型分布 -->
+                <div class="stats-card">
+                    <h3>🎯 记忆类型分布</h3>
+                    <div id="memory-type-chart" class="chart-container"></div>
+                </div>
+                
+                <!-- 地点统计 -->
+                <div class="stats-card">
+                    <h3>📍 常去地点</h3>
+                    <div id="location-stats" class="stats-list"></div>
+                </div>
+                
+                <!-- 标签统计 -->
+                <div class="stats-card">
+                    <h3>🏷️ 标签统计</h3>
+                    <div id="tag-stats" class="stats-list"></div>
+                </div>
+                
+                <!-- 时间分布 -->
+                <div class="stats-card">
+                    <h3>⏰ 时间分布</h3>
+                    <div id="time-distribution" class="chart-container"></div>
+                </div>
+            </div>
         </section>
         
         <!-- 设置页面 -->
@@ -456,5 +528,20 @@
     </div>
     
     <script src="script.js"></script>
+    
+    <!-- Service Worker 注册 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker 注册失败:', error);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
