@@ -1,5 +1,28 @@
-// API 配置
-const API_BASE_URL = 'https://love-memory-api.vercel.app/api';
+// Firebase 配置
+const firebaseConfig = {
+    apiKey: "AIzaSyD9Kv9a3i0a8w6r8X7w8w8w8w8w8w8w8w",
+    authDomain: "love-memory-keeper.firebaseapp.com",
+    projectId: "love-memory-keeper",
+    storageBucket: "love-memory-keeper.appspot.com",
+    messagingSenderId: "1234567890",
+    appId: "1:1234567890:web:abcdef1234567890"
+};
+
+// 初始化Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+
+// 本地存储键名
+const STORAGE_KEYS = {
+    MEMORIES: 'loveMemories',
+    ANNIVERSARIES: 'loveAnniversaries',
+    MESSAGES: 'loveMessages',
+    WISHES: 'loveWishes',
+    MOODS: 'loveMoods',
+    LOVE_START_DATE: 'loveStartDate'
+};
 
 // 全局变量
 let memories = [];
@@ -80,31 +103,31 @@ async function apiRequest(endpoint, method = 'GET', data = null, retryCount = 0)
 
 async function fetchAllData() {
     try {
-        // 并行请求所有数据
-        const [memoriesData, anniversariesData, messagesData, wishesData, moodsData] = await Promise.all([
-            apiRequest('/memories'),
-            apiRequest('/anniversaries'),
-            apiRequest('/messages'),
-            apiRequest('/wishes'),
-            apiRequest('/moods')
+        // 从Firebase加载数据
+        console.log('从Firebase加载数据...');
+        
+        // 并行加载所有数据
+        const [memoriesSnapshot, anniversariesSnapshot, messagesSnapshot, wishesSnapshot, moodsSnapshot] = await Promise.all([
+            db.collection('memories').get(),
+            db.collection('anniversaries').get(),
+            db.collection('messages').get(),
+            db.collection('wishes').get(),
+            db.collection('moods').get()
         ]);
         
-        // 处理 MongoDB 返回的 _id 字段，添加 id 属性
-        if (memoriesData) {
-            memories = memoriesData.map(m => ({ ...m, id: m._id || m.id }));
-        }
-        if (anniversariesData) {
-            anniversaries = anniversariesData.map(a => ({ ...a, id: a._id || a.id }));
-        }
-        if (messagesData) {
-            messages = messagesData.map(m => ({ ...m, id: m._id || m.id }));
-        }
-        if (wishesData) {
-            wishes = wishesData.map(w => ({ ...w, id: w._id || w.id }));
-        }
-        if (moodsData) {
-            moods = moodsData.map(m => ({ ...m, id: m._id || m.id }));
-        }
+        // 处理数据
+        memories = memoriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        anniversaries = anniversariesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        messages = messagesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        wishes = wishesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        moods = moodsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        
+        // 保存到本地存储作为备份
+        saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
+        saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
+        saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+        saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
+        saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
         
         // 渲染所有页面
         renderMemories();
@@ -116,10 +139,29 @@ async function fetchAllData() {
         renderPhotoWall();
         renderCountdown();
         
-        showNotification('数据加载成功！');
+        console.log('数据加载完成');
+        showNotification('数据加载成功，已同步到Firebase');
     } catch (error) {
-        console.error('Failed to fetch data:', error);
-        showNotification('数据加载失败，使用本地数据');
+        console.error('从Firebase加载数据失败:', error);
+        // 发生错误时从本地存储加载
+        console.log('从本地存储加载数据...');
+        memories = loadFromLocalStorage(STORAGE_KEYS.MEMORIES);
+        anniversaries = loadFromLocalStorage(STORAGE_KEYS.ANNIVERSARIES);
+        messages = loadFromLocalStorage(STORAGE_KEYS.MESSAGES);
+        wishes = loadFromLocalStorage(STORAGE_KEYS.WISHES);
+        moods = loadFromLocalStorage(STORAGE_KEYS.MOODS);
+        
+        // 渲染所有页面
+        renderMemories();
+        renderAnniversaries();
+        renderCalendar();
+        renderMessages();
+        renderWishes();
+        renderMoods();
+        renderPhotoWall();
+        renderCountdown();
+        
+        showNotification('Firebase连接失败，使用本地存储数据');
     }
 }
 let selectedPhotos = [];
@@ -827,15 +869,17 @@ async function importData(e) {
                         const { id, createdAt, updatedAt, ...memoryData } = memory;
                         console.log(`记忆数据:`, JSON.stringify(memoryData, null, 2));
                         
-                        // 尝试API请求
-                        let result = await apiRequest('/memories', 'POST', memoryData);
-                        
-                        if (result) {
+                        try {
+                            // 尝试保存到Firebase
+                            const docRef = await db.collection('memories').add(memoryData);
+                            const localMemory = { ...memoryData, id: docRef.id };
+                            memories.push(localMemory);
+                            saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
                             importedCount++;
                             console.log(`记忆 ${i+1}/${data.memories.length} 导入成功`);
-                        } else {
-                            // API请求失败，保存到本地存储
-                            console.log(`API请求失败，保存记忆到本地存储...`);
+                        } catch (error) {
+                            // Firebase保存失败，保存到本地存储
+                            console.log(`Firebase保存失败，保存记忆到本地存储...`, error);
                             const localMemory = { ...memoryData, id: Date.now().toString() };
                             memories.push(localMemory);
                             saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
@@ -868,15 +912,17 @@ async function importData(e) {
                         
                         const { id, createdAt, updatedAt, ...anniversaryData } = anniversary;
                         
-                        // 尝试API请求
-                        let result = await apiRequest('/anniversaries', 'POST', anniversaryData);
-                        
-                        if (result) {
+                        try {
+                            // 尝试保存到Firebase
+                            const docRef = await db.collection('anniversaries').add(anniversaryData);
+                            const localAnniversary = { ...anniversaryData, id: docRef.id };
+                            anniversaries.push(localAnniversary);
+                            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
                             importedCount++;
                             console.log(`纪念日 ${i+1}/${data.anniversaries.length} 导入成功`);
-                        } else {
-                            // API请求失败，保存到本地存储
-                            console.log(`API请求失败，保存纪念日到本地存储...`);
+                        } catch (error) {
+                            // Firebase保存失败，保存到本地存储
+                            console.log(`Firebase保存失败，保存纪念日到本地存储...`, error);
                             const localAnniversary = { ...anniversaryData, id: Date.now().toString() };
                             anniversaries.push(localAnniversary);
                             saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
@@ -908,15 +954,17 @@ async function importData(e) {
                         
                         const { id, createdAt, updatedAt, ...messageData } = message;
                         
-                        // 尝试API请求
-                        let result = await apiRequest('/messages', 'POST', messageData);
-                        
-                        if (result) {
+                        try {
+                            // 尝试保存到Firebase
+                            const docRef = await db.collection('messages').add(messageData);
+                            const localMessage = { ...messageData, id: docRef.id };
+                            messages.push(localMessage);
+                            saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
                             importedCount++;
                             console.log(`留言 ${i+1}/${data.messages.length} 导入成功`);
-                        } else {
-                            // API请求失败，保存到本地存储
-                            console.log(`API请求失败，保存留言到本地存储...`);
+                        } catch (error) {
+                            // Firebase保存失败，保存到本地存储
+                            console.log(`Firebase保存失败，保存留言到本地存储...`, error);
                             const localMessage = { ...messageData, id: Date.now().toString() };
                             messages.push(localMessage);
                             saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
@@ -952,15 +1000,17 @@ async function importData(e) {
                         const { id, createdAt, updatedAt, ...wishData } = wish;
                         console.log(`愿望数据:`, JSON.stringify(wishData, null, 2));
                         
-                        // 尝试API请求
-                        let result = await apiRequest('/wishes', 'POST', wishData);
-                        
-                        if (result) {
+                        try {
+                            // 尝试保存到Firebase
+                            const docRef = await db.collection('wishes').add(wishData);
+                            const localWish = { ...wishData, id: docRef.id };
+                            wishes.push(localWish);
+                            saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
                             importedCount++;
                             console.log(`愿望 ${i+1}/${data.wishes.length} 导入成功`);
-                        } else {
-                            // API请求失败，保存到本地存储
-                            console.log(`API请求失败，保存愿望到本地存储...`);
+                        } catch (error) {
+                            // Firebase保存失败，保存到本地存储
+                            console.log(`Firebase保存失败，保存愿望到本地存储...`, error);
                             const localWish = { ...wishData, id: Date.now().toString() };
                             wishes.push(localWish);
                             saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
@@ -994,15 +1044,17 @@ async function importData(e) {
                         
                         const { id, createdAt, updatedAt, ...moodData } = mood;
                         
-                        // 尝试API请求
-                        let result = await apiRequest('/moods', 'POST', moodData);
-                        
-                        if (result) {
+                        try {
+                            // 尝试保存到Firebase
+                            const docRef = await db.collection('moods').add(moodData);
+                            const localMood = { ...moodData, id: docRef.id };
+                            moods.push(localMood);
+                            saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
                             importedCount++;
                             console.log(`心情 ${i+1}/${data.moods.length} 导入成功`);
-                        } else {
-                            // API请求失败，保存到本地存储
-                            console.log(`API请求失败，保存心情到本地存储...`);
+                        } catch (error) {
+                            // Firebase保存失败，保存到本地存储
+                            console.log(`Firebase保存失败，保存心情到本地存储...`, error);
                             const localMood = { ...moodData, id: Date.now().toString() };
                             moods.push(localMood);
                             saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
