@@ -11,6 +11,35 @@ function setGitHubToken(token) {
     localStorage.setItem('githubToken', token);
 }
 
+// 压缩图片
+function compressImage(dataUrl, maxWidth = 800, quality = 0.7) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = function() {
+            resolve(dataUrl);
+        };
+        img.src = dataUrl;
+    });
+}
+
 // GitHub Gists API 函数
 async function saveToGist(data) {
     try {
@@ -26,12 +55,26 @@ async function saveToGist(data) {
             return true;
         }
         
+        // 压缩照片数据
+        const compressedData = {
+            ...data,
+            memories: await Promise.all(data.memories.map(async (m) => ({
+                ...m,
+                photos: m.photos ? await Promise.all(m.photos.map(async (p) => {
+                    if (typeof p === 'string' && p.startsWith('data:image') && p.length > 100000) {
+                        return await compressImage(p);
+                    }
+                    return p;
+                })) : []
+            })))
+        };
+        
         const gistData = {
             description: '恋爱记忆记录器数据',
             public: false,
             files: {
                 'love-memory-data.json': {
-                    content: JSON.stringify(data, null, 2)
+                    content: JSON.stringify(compressedData)
                 }
             }
         };
@@ -42,14 +85,25 @@ async function saveToGist(data) {
         };
         
         let response;
+        let retryCount = 0;
+        const maxRetries = 3;
+        
         const gistId = localStorage.getItem('gistId');
         if (gistId) {
-            // 更新现有Gist
-            response = await fetch(`https://api.github.com/gists/${gistId}`, {
-                method: 'PATCH',
-                headers,
-                body: JSON.stringify(gistData)
-            });
+            // 更新现有Gist，添加重试机制
+            while (retryCount < maxRetries) {
+                response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify(gistData)
+                });
+                
+                if (response.ok || response.status !== 409) break;
+                
+                retryCount++;
+                console.log(`Gist更新冲突，重试第${retryCount}次...`);
+                await new Promise(r => setTimeout(r, 1000 * retryCount));
+            }
         } else {
             // 创建新Gist
             response = await fetch('https://api.github.com/gists', {
@@ -63,34 +117,22 @@ async function saveToGist(data) {
             const result = await response.json();
             localStorage.setItem('gistId', result.id);
             console.log('数据保存到GitHub Gist成功');
-            // 同时保存到本地存储作为备份
-            saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
-            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
-            saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
-            saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
-            saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
+            showNotification('数据已同步到云端');
             return true;
         } else {
             const errorText = await response.text();
             console.error('保存到GitHub Gist失败:', errorText);
-            // 保存到本地存储作为备份
-            saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
-            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
-            saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
-            saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
-            saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
-            showNotification('GitHub同步失败，数据已保存到本地');
+            
+            if (response.status === 409) {
+                showNotification('同步冲突，请稍后重试');
+            } else {
+                showNotification('云端同步失败');
+            }
             return false;
         }
     } catch (error) {
         console.error('保存到GitHub Gist失败:', error);
-        // 保存到本地存储作为备份
-        saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
-        saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
-        saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
-        saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
-        saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
-        showNotification('网络错误，数据已保存到本地');
+        showNotification('网络错误，请检查网络连接');
         return false;
     }
 }
