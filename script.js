@@ -1,5 +1,5 @@
 // API 配置
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://love-memory-api.vercel.app/api';
 
 // 全局变量
 let memories = [];
@@ -846,8 +846,7 @@ async function importData(e) {
                     try {
                         // 检查是否重复
                         const isDuplicate = messages.some(m => 
-                            m.content === message.content && 
-                            m.mood === message.mood
+                            m.content === message.content
                         );
                         
                         if (isDuplicate) {
