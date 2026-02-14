@@ -11,6 +11,36 @@ let loveStartDate = null;
 let currentTheme = localStorage.getItem('loveTheme') || 'pink';
 let currentDate = new Date();
 
+// 本地存储键名
+const STORAGE_KEYS = {
+    MEMORIES: 'loveMemories',
+    ANNIVERSARIES: 'loveAnniversaries',
+    MESSAGES: 'loveMessages',
+    WISHES: 'loveWishes',
+    MOODS: 'loveMoods',
+    LOVE_START_DATE: 'loveStartDate'
+};
+
+// 本地存储操作函数
+function saveToLocalStorage(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+        console.log(`数据已保存到本地存储: ${key}`);
+    } catch (error) {
+        console.error('保存到本地存储失败:', error);
+    }
+}
+
+function loadFromLocalStorage(key) {
+    try {
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : [];
+    } catch (error) {
+        console.error('从本地存储加载失败:', error);
+        return [];
+    }
+}
+
 // HTTP 请求函数
 async function apiRequest(endpoint, method = 'GET', data = null, retryCount = 0) {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -796,13 +826,21 @@ async function importData(e) {
                         // 移除可能导致问题的字段
                         const { id, createdAt, updatedAt, ...memoryData } = memory;
                         console.log(`记忆数据:`, JSON.stringify(memoryData, null, 2));
-                        const result = await apiRequest('/memories', 'POST', memoryData);
+                        
+                        // 尝试API请求
+                        let result = await apiRequest('/memories', 'POST', memoryData);
+                        
                         if (result) {
                             importedCount++;
                             console.log(`记忆 ${i+1}/${data.memories.length} 导入成功`);
                         } else {
-                            failedCount++;
-                            console.error(`记忆 ${i+1}/${data.memories.length} 导入失败：无响应`);
+                            // API请求失败，保存到本地存储
+                            console.log(`API请求失败，保存记忆到本地存储...`);
+                            const localMemory = { ...memoryData, id: Date.now().toString() };
+                            memories.push(localMemory);
+                            saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
+                            importedCount++;
+                            console.log(`记忆 ${i+1}/${data.memories.length} 已保存到本地存储`);
                         }
                     } catch (err) {
                         failedCount++;
@@ -829,13 +867,21 @@ async function importData(e) {
                         }
                         
                         const { id, createdAt, updatedAt, ...anniversaryData } = anniversary;
-                        const result = await apiRequest('/anniversaries', 'POST', anniversaryData);
+                        
+                        // 尝试API请求
+                        let result = await apiRequest('/anniversaries', 'POST', anniversaryData);
+                        
                         if (result) {
                             importedCount++;
                             console.log(`纪念日 ${i+1}/${data.anniversaries.length} 导入成功`);
                         } else {
-                            failedCount++;
-                            console.error(`纪念日 ${i+1}/${data.anniversaries.length} 导入失败：无响应`);
+                            // API请求失败，保存到本地存储
+                            console.log(`API请求失败，保存纪念日到本地存储...`);
+                            const localAnniversary = { ...anniversaryData, id: Date.now().toString() };
+                            anniversaries.push(localAnniversary);
+                            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
+                            importedCount++;
+                            console.log(`纪念日 ${i+1}/${data.anniversaries.length} 已保存到本地存储`);
                         }
                     } catch (err) {
                         failedCount++;
@@ -861,13 +907,21 @@ async function importData(e) {
                         }
                         
                         const { id, createdAt, updatedAt, ...messageData } = message;
-                        const result = await apiRequest('/messages', 'POST', messageData);
+                        
+                        // 尝试API请求
+                        let result = await apiRequest('/messages', 'POST', messageData);
+                        
                         if (result) {
                             importedCount++;
                             console.log(`留言 ${i+1}/${data.messages.length} 导入成功`);
                         } else {
-                            failedCount++;
-                            console.error(`留言 ${i+1}/${data.messages.length} 导入失败：无响应`);
+                            // API请求失败，保存到本地存储
+                            console.log(`API请求失败，保存留言到本地存储...`);
+                            const localMessage = { ...messageData, id: Date.now().toString() };
+                            messages.push(localMessage);
+                            saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+                            importedCount++;
+                            console.log(`留言 ${i+1}/${data.messages.length} 已保存到本地存储`);
                         }
                     } catch (err) {
                         failedCount++;
@@ -897,13 +951,21 @@ async function importData(e) {
                         // 移除可能导致问题的字段
                         const { id, createdAt, updatedAt, ...wishData } = wish;
                         console.log(`愿望数据:`, JSON.stringify(wishData, null, 2));
-                        const result = await apiRequest('/wishes', 'POST', wishData);
+                        
+                        // 尝试API请求
+                        let result = await apiRequest('/wishes', 'POST', wishData);
+                        
                         if (result) {
                             importedCount++;
                             console.log(`愿望 ${i+1}/${data.wishes.length} 导入成功`);
                         } else {
-                            failedCount++;
-                            console.error(`愿望 ${i+1}/${data.wishes.length} 导入失败：无响应`);
+                            // API请求失败，保存到本地存储
+                            console.log(`API请求失败，保存愿望到本地存储...`);
+                            const localWish = { ...wishData, id: Date.now().toString() };
+                            wishes.push(localWish);
+                            saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
+                            importedCount++;
+                            console.log(`愿望 ${i+1}/${data.wishes.length} 已保存到本地存储`);
                         }
                     } catch (err) {
                         failedCount++;
@@ -931,13 +993,21 @@ async function importData(e) {
                         }
                         
                         const { id, createdAt, updatedAt, ...moodData } = mood;
-                        const result = await apiRequest('/moods', 'POST', moodData);
+                        
+                        // 尝试API请求
+                        let result = await apiRequest('/moods', 'POST', moodData);
+                        
                         if (result) {
                             importedCount++;
                             console.log(`心情 ${i+1}/${data.moods.length} 导入成功`);
                         } else {
-                            failedCount++;
-                            console.error(`心情 ${i+1}/${data.moods.length} 导入失败：无响应`);
+                            // API请求失败，保存到本地存储
+                            console.log(`API请求失败，保存心情到本地存储...`);
+                            const localMood = { ...moodData, id: Date.now().toString() };
+                            moods.push(localMood);
+                            saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
+                            importedCount++;
+                            console.log(`心情 ${i+1}/${data.moods.length} 已保存到本地存储`);
                         }
                     } catch (err) {
                         failedCount++;
