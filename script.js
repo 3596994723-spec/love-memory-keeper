@@ -1,24 +1,83 @@
-// Firebase 配置
-const firebaseConfig = {
-    apiKey: "AIzaSyD9Kv9a3i0a8w6r8X7w8w8w8w8w8w8w8w",
-    authDomain: "love-memory-keeper.firebaseapp.com",
-    projectId: "love-memory-keeper",
-    storageBucket: "love-memory-keeper.appspot.com",
-    messagingSenderId: "1234567890",
-    appId: "1:1234567890:web:abcdef1234567890"
-};
+// GitHub Gists 配置
+const GIST_ID = 'love-memory-keeper-data';
+const GITHUB_TOKEN = ''; // 用户需要在GitHub生成个人访问令牌
 
-// 初始化Firebase
-let db = null;
-try {
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
+// GitHub Gists API 函数
+async function saveToGist(data) {
+    try {
+        const gistData = {
+            description: '恋爱记忆记录器数据',
+            public: false,
+            files: {
+                'love-memory-data.json': {
+                    content: JSON.stringify(data, null, 2)
+                }
+            }
+        };
+        
+        let response;
+        if (localStorage.getItem('gistId')) {
+            // 更新现有Gist
+            response = await fetch(`https://api.github.com/gists/${localStorage.getItem('gistId')}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+                },
+                body: JSON.stringify(gistData)
+            });
+        } else {
+            // 创建新Gist
+            response = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+                },
+                body: JSON.stringify(gistData)
+            });
+        }
+        
+        if (response.ok) {
+            const result = await response.json();
+            localStorage.setItem('gistId', result.id);
+            console.log('数据保存到GitHub Gist成功');
+            return true;
+        } else {
+            console.error('保存到GitHub Gist失败:', await response.text());
+            return false;
+        }
+    } catch (error) {
+        console.error('保存到GitHub Gist失败:', error);
+        return false;
     }
-    db = firebase.firestore();
-    console.log('Firebase初始化成功');
-} catch (error) {
-    console.error('Firebase初始化失败:', error);
-    showNotification('Firebase初始化失败，使用本地存储模式');
+}
+
+async function loadFromGist() {
+    try {
+        const gistId = localStorage.getItem('gistId');
+        if (!gistId) return null;
+        
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: {
+                ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            const content = result.files['love-memory-data.json'].content;
+            const data = JSON.parse(content);
+            console.log('从GitHub Gist加载数据成功');
+            return data;
+        } else {
+            console.error('从GitHub Gist加载数据失败:', await response.text());
+            return null;
+        }
+    } catch (error) {
+        console.error('从GitHub Gist加载数据失败:', error);
+        return null;
+    }
 }
 
 
@@ -102,13 +161,37 @@ async function apiRequest(endpoint, method = 'GET', data = null, retryCount = 0)
 
 async function fetchAllData() {
     try {
-        // 直接从本地存储加载数据，跳过Firebase
-        console.log('从本地存储加载数据...');
-        memories = loadFromLocalStorage(STORAGE_KEYS.MEMORIES);
-        anniversaries = loadFromLocalStorage(STORAGE_KEYS.ANNIVERSARIES);
-        messages = loadFromLocalStorage(STORAGE_KEYS.MESSAGES);
-        wishes = loadFromLocalStorage(STORAGE_KEYS.WISHES);
-        moods = loadFromLocalStorage(STORAGE_KEYS.MOODS);
+        // 尝试从GitHub Gist加载数据
+        console.log('从GitHub Gist加载数据...');
+        const gistData = await loadFromGist();
+        
+        if (gistData) {
+            // 使用Gist数据
+            memories = gistData.memories || [];
+            anniversaries = gistData.anniversaries || [];
+            messages = gistData.messages || [];
+            wishes = gistData.wishes || [];
+            moods = gistData.moods || [];
+            
+            // 保存到本地存储作为备份
+            saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
+            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
+            saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+            saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
+            saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
+            
+            showNotification('数据加载成功，已同步到GitHub Gist');
+        } else {
+            // Gist加载失败，从本地存储加载
+            console.log('从本地存储加载数据...');
+            memories = loadFromLocalStorage(STORAGE_KEYS.MEMORIES);
+            anniversaries = loadFromLocalStorage(STORAGE_KEYS.ANNIVERSARIES);
+            messages = loadFromLocalStorage(STORAGE_KEYS.MESSAGES);
+            wishes = loadFromLocalStorage(STORAGE_KEYS.WISHES);
+            moods = loadFromLocalStorage(STORAGE_KEYS.MOODS);
+            
+            showNotification('使用本地存储数据');
+        }
         
         // 渲染所有页面
         renderMemories();
@@ -121,7 +204,6 @@ async function fetchAllData() {
         renderCountdown();
         
         console.log('数据加载完成');
-        showNotification('使用本地存储数据');
     } catch (error) {
         console.error('加载数据失败:', error);
         // 发生错误时初始化空数据
@@ -1039,6 +1121,18 @@ async function importData(e) {
                 startLoveTimer();
                 console.log('恋爱开始日期导入成功:', loveStartDate);
             }
+            
+            // 保存到GitHub Gist
+            console.log('保存数据到GitHub Gist...');
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
             
             // 重新加载数据
             console.log('导入完成，重新加载数据...');
