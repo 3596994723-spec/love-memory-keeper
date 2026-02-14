@@ -120,42 +120,7 @@ function loadFromLocalStorage(key) {
     }
 }
 
-// HTTP 请求函数
-async function apiRequest(endpoint, method = 'GET', data = null, retryCount = 0) {
-    const url = `${API_BASE_URL}${endpoint}`;
-    const options = {
-        method,
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    };
-    
-    if (data) {
-        options.body = JSON.stringify(data);
-    }
-    
-    try {
-        console.log('API request:', method, url, data);
-        const response = await fetch(url, options);
-        console.log('API response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const result = await response.json();
-        console.log('API response:', result);
-        return result;
-    } catch (error) {
-        console.error('API request failed:', error);
-        // 最多重试2次
-        if (retryCount < 2) {
-            console.log(`重试请求 (${retryCount + 1}/2)...`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒后重试
-            return apiRequest(endpoint, method, data, retryCount + 1);
-        }
-        showNotification(`网络请求失败: ${error.message}`);
-        return null;
-    }
-}
+// HTTP 请求函数已移除，现在直接使用GitHub Gist API进行数据存储
 
 async function fetchAllData() {
     try {
@@ -648,12 +613,25 @@ async function addWish() {
         completed: false
     };
     
-    const result = await apiRequest('/wishes', 'POST', wishData);
-    if (result) {
-        await fetchAllData();
-        input.value = '';
-        showNotification('愿望添加成功！');
-    }
+    // 直接添加到本地数据
+    const newWish = { ...wishData, id: Date.now().toString() };
+    wishes.push(newWish);
+    
+    // 保存到GitHub Gist
+    const saveData = {
+        memories,
+        anniversaries,
+        messages,
+        wishes,
+        moods,
+        loveStartDate
+    };
+    await saveToGist(saveData);
+    
+    // 重新加载数据
+    await fetchAllData();
+    input.value = '';
+    showNotification('愿望添加成功！');
 }
 
 function renderWishes() {
@@ -683,20 +661,51 @@ function renderWishes() {
 async function toggleWish(id) {
     const wish = wishes.find(w => w.id === id);
     if (wish) {
-        const updatedWish = { ...wish, completed: !wish.completed };
-        const result = await apiRequest(`/wishes/${id}`, 'PUT', updatedWish);
-        if (result) {
-            await fetchAllData();
-        }
+        // 直接更新本地数据
+        wish.completed = !wish.completed;
+        
+        // 保存到GitHub Gist
+        const saveData = {
+            memories,
+            anniversaries,
+            messages,
+            wishes,
+            moods,
+            loveStartDate
+        };
+        await saveToGist(saveData);
+        
+        // 重新加载数据
+        await fetchAllData();
+        showNotification('愿望状态已更新');
+    } else {
+        showNotification('更新失败：愿望不存在');
     }
 }
 
 async function deleteWish(id) {
     if (confirm('确定要删除这个愿望吗？')) {
-        const result = await apiRequest(`/wishes/${id}`, 'DELETE');
-        if (result) {
+        // 直接删除本地数据
+        const index = wishes.findIndex(w => w.id === id);
+        if (index !== -1) {
+            wishes.splice(index, 1);
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
+            
+            // 重新加载数据
             await fetchAllData();
             showNotification('愿望已删除');
+        } else {
+            showNotification('删除失败：愿望不存在');
         }
     }
 }
@@ -721,29 +730,54 @@ async function saveMood() {
     
     if (editingMoodId) {
         // 修改现有心情
-        const result = await apiRequest(`/moods/${editingMoodId}`, 'PUT', moodData);
-        if (result) {
-            await fetchAllData();
+        const index = moods.findIndex(m => m.id === editingMoodId);
+        if (index !== -1) {
+            moods[index] = { ...moodData, id: editingMoodId };
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
+            
+            // 重新加载数据
             editingMoodId = null;
+            await fetchAllData();
             showNotification('心情修改成功！');
+        } else {
+            showNotification('修改失败：心情记录不存在');
         }
     } else {
         // 检查今天是否已打卡
         const existingIndex = moods.findIndex(m => m.date === today);
         
         if (existingIndex !== -1) {
-            const existingMood = moods[existingIndex];
-            const result = await apiRequest(`/moods/${existingMood.id}`, 'PUT', moodData);
-            if (result) {
-                await fetchAllData();
-            }
+            // 更新现有心情
+            moods[existingIndex] = { ...moodData, id: moods[existingIndex].id };
         } else {
-            const result = await apiRequest('/moods', 'POST', moodData);
-            if (result) {
-                await fetchAllData();
-            }
+            // 添加新心情
+            const newMood = { ...moodData, id: Date.now().toString() };
+            moods.push(newMood);
         }
         
+        // 保存到GitHub Gist
+        const saveData = {
+            memories,
+            anniversaries,
+            messages,
+            wishes,
+            moods,
+            loveStartDate
+        };
+        await saveToGist(saveData);
+        
+        // 重新加载数据
+        await fetchAllData();
         showNotification('心情保存成功！');
     }
     
@@ -776,10 +810,27 @@ function editMood(id) {
 
 async function deleteMood(id) {
     if (confirm('确定要删除这个心情记录吗？')) {
-        const result = await apiRequest(`/moods/${id}`, 'DELETE');
-        if (result) {
+        // 直接删除本地数据
+        const index = moods.findIndex(m => m.id === id);
+        if (index !== -1) {
+            moods.splice(index, 1);
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
+            
+            // 重新加载数据
             await fetchAllData();
             showNotification('心情记录已删除');
+        } else {
+            showNotification('删除失败：心情记录不存在');
         }
     }
 }
@@ -1157,21 +1208,23 @@ async function importData(e) {
 async function clearAllData() {
     if (confirm('确定要清除所有数据吗？此操作不可恢复！')) {
         if (confirm('再次确认：所有记忆、纪念日、留言等数据都将被删除！')) {
-            // 并行删除所有数据
-            await Promise.all([
-                apiRequest('/memories/clear', 'DELETE'),
-                apiRequest('/anniversaries/clear', 'DELETE'),
-                apiRequest('/messages/clear', 'DELETE'),
-                apiRequest('/wishes/clear', 'DELETE'),
-                apiRequest('/moods/clear', 'DELETE')
-            ]);
-            
             // 清空本地数据
             memories = [];
             anniversaries = [];
             messages = [];
             wishes = [];
             moods = [];
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
             
             // 重新渲染页面
             renderMemories();
@@ -1560,12 +1613,25 @@ async function addMemory() {
         tags: selectedTags
     };
     
-    const result = await apiRequest('/memories', 'POST', memoryData);
-    if (result) {
-        await fetchAllData();
-        resetMemoryForm();
-        showNotification('记忆添加成功！');
-    }
+    // 直接添加到本地数据
+    const newMemory = { ...memoryData, id: Date.now().toString() };
+    memories.unshift(newMemory);
+    
+    // 保存到GitHub Gist
+    const saveData = {
+        memories,
+        anniversaries,
+        messages,
+        wishes,
+        moods,
+        loveStartDate
+    };
+    await saveToGist(saveData);
+    
+    // 重新加载数据
+    await fetchAllData();
+    resetMemoryForm();
+    showNotification('记忆添加成功！');
 }
 
 async function updateMemory() {
@@ -1610,12 +1676,29 @@ async function updateMemory() {
         tags: selectedTags
     };
     
-    const result = await apiRequest(`/memories/${editingMemoryId}`, 'PUT', memoryData);
-    if (result) {
+    // 直接更新本地数据
+    const index = memories.findIndex(m => m.id === editingMemoryId);
+    if (index !== -1) {
+        memories[index] = { ...memoryData, id: editingMemoryId };
+        
+        // 保存到GitHub Gist
+        const saveData = {
+            memories,
+            anniversaries,
+            messages,
+            wishes,
+            moods,
+            loveStartDate
+        };
+        await saveToGist(saveData);
+        
+        // 重新加载数据
         editingMemoryId = null;
         await fetchAllData();
         resetMemoryForm();
         showNotification('记忆更新成功！');
+    } else {
+        showNotification('记忆更新失败：记忆不存在');
     }
 }
 
@@ -1699,10 +1782,27 @@ async function deleteMemory(id) {
     }
     if (confirm('确定要删除这个记忆吗？')) {
         console.log('删除记忆：', id);
-        const result = await apiRequest(`/memories/${id}`, 'DELETE');
-        if (result) {
+        // 直接删除本地数据
+        const index = memories.findIndex(m => m.id === id);
+        if (index !== -1) {
+            memories.splice(index, 1);
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
+            
+            // 重新加载数据
             await fetchAllData();
             showNotification('记忆已删除');
+        } else {
+            showNotification('删除失败：记忆不存在');
         }
     }
 }
@@ -1823,13 +1923,26 @@ async function addAnniversary() {
         description: desc
     };
     
-    const result = await apiRequest('/anniversaries', 'POST', anniversaryData);
-    if (result) {
-        await fetchAllData();
-        document.getElementById('anniversary-name').value = '';
-        document.getElementById('anniversary-description').value = '';
-        showNotification('纪念日添加成功！');
-    }
+    // 直接添加到本地数据
+    const newAnniversary = { ...anniversaryData, id: Date.now().toString() };
+    anniversaries.push(newAnniversary);
+    
+    // 保存到GitHub Gist
+    const saveData = {
+        memories,
+        anniversaries,
+        messages,
+        wishes,
+        moods,
+        loveStartDate
+    };
+    await saveToGist(saveData);
+    
+    // 重新加载数据
+    await fetchAllData();
+    document.getElementById('anniversary-name').value = '';
+    document.getElementById('anniversary-description').value = '';
+    showNotification('纪念日添加成功！');
 }
 
 async function updateAnniversary() {
@@ -1848,12 +1961,29 @@ async function updateAnniversary() {
         description: desc
     };
     
-    const result = await apiRequest(`/anniversaries/${editingAnniversaryId}`, 'PUT', anniversaryData);
-    if (result) {
+    // 直接更新本地数据
+    const index = anniversaries.findIndex(a => a.id === editingAnniversaryId);
+    if (index !== -1) {
+        anniversaries[index] = { ...anniversaryData, id: editingAnniversaryId };
+        
+        // 保存到GitHub Gist
+        const saveData = {
+            memories,
+            anniversaries,
+            messages,
+            wishes,
+            moods,
+            loveStartDate
+        };
+        await saveToGist(saveData);
+        
+        // 重新加载数据
         editingAnniversaryId = null;
         await fetchAllData();
         resetAnniversaryForm();
         showNotification('纪念日更新成功！');
+    } else {
+        showNotification('更新失败：纪念日不存在');
     }
 }
 
@@ -1887,10 +2017,28 @@ function editAnniversary(id) {
 
 async function deleteAnniversary(id) {
     if (confirm('确定要删除这个纪念日吗？')) {
-        const result = await apiRequest(`/anniversaries/${id}`, 'DELETE');
-        if (result) {
+        console.log('删除纪念日：', id);
+        // 直接删除本地数据
+        const index = anniversaries.findIndex(a => a.id === id);
+        if (index !== -1) {
+            anniversaries.splice(index, 1);
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
+            
+            // 重新加载数据
             await fetchAllData();
             showNotification('纪念日已删除');
+        } else {
+            showNotification('删除失败：纪念日不存在');
         }
     }
 }
@@ -1955,16 +2103,30 @@ async function addMessage() {
     const messageData = {
         content,
         mood: moodNames[mood],
-        hasVoice: content.includes('[语音留言]')
+        hasVoice: content.includes('[语音留言]'),
+        createdAt: new Date().toISOString()
     };
     
-    const result = await apiRequest('/messages', 'POST', messageData);
-    if (result) {
-        await fetchAllData();
-        document.getElementById('message-content').value = '';
-        document.getElementById('message-mood').value = 'love';
-        showNotification('留言发送成功！');
-    }
+    // 直接添加到本地数据
+    const newMessage = { ...messageData, id: Date.now().toString() };
+    messages.push(newMessage);
+    
+    // 保存到GitHub Gist
+    const saveData = {
+        memories,
+        anniversaries,
+        messages,
+        wishes,
+        moods,
+        loveStartDate
+    };
+    await saveToGist(saveData);
+    
+    // 重新加载数据
+    await fetchAllData();
+    document.getElementById('message-content').value = '';
+    document.getElementById('message-mood').value = 'love';
+    showNotification('留言发送成功！');
 }
 
 function renderMessages() {
@@ -1994,10 +2156,27 @@ function renderMessages() {
 
 async function deleteMessage(id) {
     if (confirm('确定要删除这条留言吗？')) {
-        const result = await apiRequest(`/messages/${id}`, 'DELETE');
-        if (result) {
+        // 直接删除本地数据
+        const index = messages.findIndex(m => m.id === id);
+        if (index !== -1) {
+            messages.splice(index, 1);
+            
+            // 保存到GitHub Gist
+            const saveData = {
+                memories,
+                anniversaries,
+                messages,
+                wishes,
+                moods,
+                loveStartDate
+            };
+            await saveToGist(saveData);
+            
+            // 重新加载数据
             await fetchAllData();
             showNotification('留言已删除');
+        } else {
+            showNotification('删除失败：留言不存在');
         }
     }
 }
