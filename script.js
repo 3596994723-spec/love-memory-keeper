@@ -2167,10 +2167,11 @@ async function addAnniversary() {
     };
     await saveToGist(saveData);
     
-    // 重新加载数据
-    await fetchAllData();
-    document.getElementById('anniversary-name').value = '';
-    document.getElementById('anniversary-description').value = '';
+    // 重置表单并重新渲染
+    resetAnniversaryForm();
+    renderAnniversaries();
+    renderCalendar();
+    renderCountdown();
     showNotification('纪念日添加成功！');
 }
 
@@ -2206,10 +2207,11 @@ async function updateAnniversary() {
         };
         await saveToGist(saveData);
         
-        // 重新加载数据
-        editingAnniversaryId = null;
-        await fetchAllData();
+        // 重置表单并重新渲染
         resetAnniversaryForm();
+        renderAnniversaries();
+        renderCalendar();
+        renderCountdown();
         showNotification('纪念日更新成功！');
     } else {
         showNotification('更新失败：纪念日不存在');
