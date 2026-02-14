@@ -211,18 +211,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 绑定所有事件
 function bindAllEvents() {
-    // 卡片点击
-    document.querySelectorAll('.card').forEach(card => {
-        card.addEventListener('click', function() {
-            showPage(this.getAttribute('data-page'));
-        });
-    });
-    
-    // 返回按钮
-    document.querySelectorAll('.back-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+    // 使用事件委托绑定卡片点击事件
+    document.addEventListener('click', function(e) {
+        // 处理卡片点击
+        if (e.target.closest('.card')) {
+            const card = e.target.closest('.card');
+            const page = card.getAttribute('data-page');
+            if (page) {
+                showPage(page);
+            }
+        }
+        
+        // 处理返回按钮点击
+        if (e.target.closest('.back-btn')) {
             showPage('home');
-        });
+        }
     });
     
     // 表单提交
