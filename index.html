@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -23,16 +23,7 @@
     </script>
 </head>
 <body>
-    <!-- 密码保护遮罩 -->
-    <div id="password-overlay" class="password-overlay">
-        <div class="password-box">
-            <h2>🔐 请输入密码</h2>
-            <p>这是我们的私密空间</p>
-            <input type="password" id="password-input" placeholder="请输入密码">
-            <button id="password-submit" class="btn">进入</button>
-            <p class="password-hint">首次使用请设置密码</p>
-        </div>
-    </div>
+    
 
     <!-- 背景音乐控制 -->
     <div id="music-control" class="music-control">
@@ -108,12 +99,6 @@
                     <p>记录新的恋爱记忆</p>
                 </div>
                 
-                <div class="card" data-page="photo-wall">
-                    <div class="card-icon">📸</div>
-                    <h3>照片墙</h3>
-                    <p>浏览我们的照片</p>
-                </div>
-                
                 <div class="card" data-page="wishlist">
                     <div class="card-icon">📝</div>
                     <h3>愿望清单</h3>
@@ -126,6 +111,12 @@
                     <p>记录每日心情</p>
                 </div>
                 
+                <div class="card" data-page="messages">
+                    <div class="card-icon">💌</div>
+                    <h3>甜蜜留言</h3>
+                    <p>互相留言表达爱意</p>
+                </div>
+                
                 <div class="card" data-page="calendar">
                     <div class="card-icon">📅</div>
                     <h3>记忆日历</h3>
@@ -136,6 +127,12 @@
                     <div class="card-icon">🗺️</div>
                     <h3>记忆地图</h3>
                     <p>查看我们去过的地方</p>
+                </div>
+                
+                <div class="card" data-page="photo-wall">
+                    <div class="card-icon">📸</div>
+                    <h3>照片墙</h3>
+                    <p>浏览我们的照片</p>
                 </div>
                 
                 <div class="card" data-page="anniversary">
@@ -154,12 +151,6 @@
                     <div class="card-icon">💝</div>
                     <h3>我的记忆</h3>
                     <p>查看所有记忆记录</p>
-                </div>
-                
-                <div class="card" data-page="messages">
-                    <div class="card-icon">💌</div>
-                    <h3>甜蜜留言</h3>
-                    <p>互相留言表达爱意</p>
                 </div>
                 
                 <div class="card" data-page="stats">
@@ -189,7 +180,7 @@
             <h2>愿望清单</h2>
             <p class="page-hint">想一起做的事情</p>
             <form id="wishlist-form">
-                <div class="form-group">
+                <div class="form-group wishlist-form-group">
                     <input type="text" id="wish-input" placeholder="添加一个愿望..." maxlength="100">
                     <button type="submit" class="btn">添加</button>
                 </div>
@@ -458,16 +449,16 @@
             <h2>设置</h2>
             
             <div class="settings-section">
-                <h3>🔐 密码设置</h3>
+
                 <div class="form-group">
-                    <label for="new-password">新密码：</label>
-                    <input type="password" id="new-password" placeholder="留空则不修改">
+
+
                 </div>
                 <div class="form-group">
-                    <label for="confirm-password">确认密码：</label>
-                    <input type="password" id="confirm-password" placeholder="再次输入新密码">
+
+
                 </div>
-                <button class="btn" id="save-password-btn">保存密码</button>
+
             </div>
             
             <div class="settings-section">

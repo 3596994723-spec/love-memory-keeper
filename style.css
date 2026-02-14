@@ -585,6 +585,30 @@ section.page h2 {
 }
 
 /* 愿望清单 */
+.wishlist-form-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.wishlist-form-group input {
+    flex: 1;
+    padding: 12px;
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-family: 'Press Start 2P', cursive;
+    font-size: 0.5rem;
+}
+
+.wishlist-form-group button {
+    white-space: nowrap;
+    padding: 12px 20px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 0.5rem;
+}
+
 .wishlist-stats {
     display: flex;
     justify-content: space-around;
@@ -775,6 +799,18 @@ section.page h2 {
     font-size: 0.55rem;
     color: var(--text-color);
     margin-top: 5px;
+}
+
+.mood-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.mood-actions .btn {
+    padding: 8px 12px;
+    font-size: 0.5rem;
+    border: 2px solid #fff;
+    box-shadow: 2px 2px 0 var(--primary-color);
 }
 
 /* 日历样式 */

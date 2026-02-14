@@ -1,13 +1,91 @@
+// API 配置
+const API_BASE_URL = 'http://localhost:3001/api';
+
 // 全局变量
-let memories = JSON.parse(localStorage.getItem('loveMemories')) || [];
-let anniversaries = JSON.parse(localStorage.getItem('loveAnniversaries')) || [];
-let messages = JSON.parse(localStorage.getItem('loveMessages')) || [];
-let wishes = JSON.parse(localStorage.getItem('loveWishes')) || [];
-let moods = JSON.parse(localStorage.getItem('loveMoods')) || [];
-let loveStartDate = localStorage.getItem('loveStartDate') || null;
-let password = localStorage.getItem('lovePassword') || '';
+let memories = [];
+let anniversaries = [];
+let messages = [];
+let wishes = [];
+let moods = [];
+let loveStartDate = null;
 let currentTheme = localStorage.getItem('loveTheme') || 'pink';
 let currentDate = new Date();
+
+// HTTP 请求函数
+async function apiRequest(endpoint, method = 'GET', data = null) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    };
+    
+    if (data) {
+        options.body = JSON.stringify(data);
+    }
+    
+    try {
+        console.log('API request:', method, url, data);
+        const response = await fetch(url, options);
+        console.log('API response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const result = await response.json();
+        console.log('API response:', result);
+        return result;
+    } catch (error) {
+        console.error('API request failed:', error);
+        showNotification(`网络请求失败: ${error.message}`);
+        return null;
+    }
+}
+
+async function fetchAllData() {
+    try {
+        // 并行请求所有数据
+        const [memoriesData, anniversariesData, messagesData, wishesData, moodsData] = await Promise.all([
+            apiRequest('/memories'),
+            apiRequest('/anniversaries'),
+            apiRequest('/messages'),
+            apiRequest('/wishes'),
+            apiRequest('/moods')
+        ]);
+        
+        // 处理 MongoDB 返回的 _id 字段，添加 id 属性
+        if (memoriesData) {
+            memories = memoriesData.map(m => ({ ...m, id: m._id || m.id }));
+        }
+        if (anniversariesData) {
+            anniversaries = anniversariesData.map(a => ({ ...a, id: a._id || a.id }));
+        }
+        if (messagesData) {
+            messages = messagesData.map(m => ({ ...m, id: m._id || m.id }));
+        }
+        if (wishesData) {
+            wishes = wishesData.map(w => ({ ...w, id: w._id || w.id }));
+        }
+        if (moodsData) {
+            moods = moodsData.map(m => ({ ...m, id: m._id || m.id }));
+        }
+        
+        // 渲染所有页面
+        renderMemories();
+        renderAnniversaries();
+        renderCalendar();
+        renderMessages();
+        renderWishes();
+        renderMoods();
+        renderPhotoWall();
+        renderCountdown();
+        
+        showNotification('数据加载成功！');
+    } catch (error) {
+        console.error('Failed to fetch data:', error);
+        showNotification('数据加载失败，使用本地数据');
+    }
+}
 let selectedPhotos = [];
 let selectedLocations = [];
 let selectedTags = [];
@@ -23,8 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 应用主题
     document.body.setAttribute('data-theme', currentTheme);
     
-    // 检查密码
-    checkPassword();
+    // 从localStorage加载恋爱开始日期
+    loveStartDate = localStorage.getItem('loveStartDate') || null;
+    console.log('从localStorage加载恋爱开始日期:', loveStartDate);
     
     // 初始化页面
     renderMemories();
@@ -45,31 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 绑定所有事件
     bindAllEvents();
+    
+    // 从后端加载数据
+    fetchAllData();
 });
 
-// 检查密码
-function checkPassword() {
-    const overlay = document.getElementById('password-overlay');
-    if (!password) {
-        overlay.classList.add('hidden');
-        return;
-    }
-    
-    document.getElementById('password-submit').addEventListener('click', function() {
-        const input = document.getElementById('password-input').value;
-        if (input === password) {
-            overlay.classList.add('hidden');
-        } else {
-            alert('密码错误！');
-        }
-    });
-    
-    document.getElementById('password-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            document.getElementById('password-submit').click();
-        }
-    });
-}
+
 
 // 绑定所有事件
 function bindAllEvents() {
@@ -241,12 +301,11 @@ function bindAllEvents() {
     });
     
     // 设置页面
-    document.getElementById('save-password-btn').addEventListener('click', savePassword);
-    document.getElementById('save-start-date-btn').addEventListener('click', function() {
+    document.getElementById('save-start-date-btn').addEventListener('click', async function() {
         const date = document.getElementById('love-start-date').value;
         if (date) {
             loveStartDate = date;
-            localStorage.setItem('loveStartDate', loveStartDate);
+            // 这里可以添加 API 请求来保存恋爱开始日期
             startLoveTimer();
             showNotification('日期保存成功！');
         }
@@ -279,6 +338,7 @@ function showPage(pageName) {
         else if (pageName === 'photo-wall') renderPhotoWall();
         else if (pageName === 'map') setTimeout(initMap, 100);
         else if (pageName === 'stats') renderStats();
+        else if (pageName === 'add-memory' && !editingMemoryId) resetMemoryForm();
         else if (pageName === 'home') {
             renderCountdown();
             startLoveTimer();
@@ -288,13 +348,28 @@ function showPage(pageName) {
 
 // 恋爱计时器
 function startLoveTimer() {
+    const setStartDateBtn = document.getElementById('set-start-date');
+    
+    // 根据是否设置了恋爱开始日期来显示或隐藏设置按钮
+    if (setStartDateBtn) {
+        if (loveStartDate) {
+            setStartDateBtn.style.display = 'none';
+        } else {
+            setStartDateBtn.style.display = 'block';
+        }
+    }
+    
     if (!loveStartDate) return;
     
     const startDate = new Date(loveStartDate);
     
     function updateTimer() {
+        // 获取当前时间并转换为北京时间（UTC+8）
         const now = new Date();
-        const diff = now - startDate;
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const beijingTime = new Date(utc + 8 * 60 * 60 * 1000);
+        
+        const diff = beijingTime - startDate;
         
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -421,16 +496,22 @@ function showPhoto(src) {
 }
 
 // 愿望清单
-function addWish() {
+async function addWish() {
     const input = document.getElementById('wish-input');
     const text = input.value.trim();
     if (!text) return;
     
-    wishes.push({ id: Date.now(), text, completed: false, createdAt: new Date().toISOString() });
-    localStorage.setItem('loveWishes', JSON.stringify(wishes));
-    input.value = '';
-    renderWishes();
-    showNotification('愿望添加成功！');
+    const wishData = {
+        text,
+        completed: false
+    };
+    
+    const result = await apiRequest('/wishes', 'POST', wishData);
+    if (result) {
+        await fetchAllData();
+        input.value = '';
+        showNotification('愿望添加成功！');
+    }
 }
 
 function renderWishes() {
@@ -448,35 +529,40 @@ function renderWishes() {
     
     container.innerHTML = wishes.sort((a, b) => a.completed - b.completed).map(w => `
         <div class="wish-item ${w.completed ? 'completed' : ''}">
-            <div class="wish-checkbox ${w.completed ? 'checked' : ''}" onclick="toggleWish(${w.id})">
+            <div class="wish-checkbox ${w.completed ? 'checked' : ''}" onclick="toggleWish('${w.id}')">
                 ${w.completed ? '✓' : ''}
             </div>
             <span class="wish-text">${w.text}</span>
-            <button class="wish-delete" onclick="deleteWish(${w.id})">×</button>
+            <button class="wish-delete" onclick="deleteWish('${w.id}')">×</button>
         </div>
     `).join('');
 }
 
-function toggleWish(id) {
+async function toggleWish(id) {
     const wish = wishes.find(w => w.id === id);
     if (wish) {
-        wish.completed = !wish.completed;
-        localStorage.setItem('loveWishes', JSON.stringify(wishes));
-        renderWishes();
+        const updatedWish = { ...wish, completed: !wish.completed };
+        const result = await apiRequest(`/wishes/${id}`, 'PUT', updatedWish);
+        if (result) {
+            await fetchAllData();
+        }
     }
 }
 
-function deleteWish(id) {
+async function deleteWish(id) {
     if (confirm('确定要删除这个愿望吗？')) {
-        wishes = wishes.filter(w => w.id !== id);
-        localStorage.setItem('loveWishes', JSON.stringify(wishes));
-        renderWishes();
-        showNotification('愿望已删除');
+        const result = await apiRequest(`/wishes/${id}`, 'DELETE');
+        if (result) {
+            await fetchAllData();
+            showNotification('愿望已删除');
+        }
     }
 }
 
 // 心情打卡
-function saveMood() {
+let editingMoodId = null;
+
+async function saveMood() {
     if (!selectedMood) {
         alert('请选择今天的心情！');
         return;
@@ -485,20 +571,75 @@ function saveMood() {
     const note = document.getElementById('mood-note').value.trim();
     const today = new Date().toISOString().split('T')[0];
     
-    // 检查今天是否已打卡
-    const existingIndex = moods.findIndex(m => m.date === today);
-    if (existingIndex !== -1) {
-        moods[existingIndex] = { ...moods[existingIndex], mood: selectedMood, note };
+    const moodData = {
+        date: today,
+        mood: selectedMood,
+        note
+    };
+    
+    if (editingMoodId) {
+        // 修改现有心情
+        const result = await apiRequest(`/moods/${editingMoodId}`, 'PUT', moodData);
+        if (result) {
+            await fetchAllData();
+            editingMoodId = null;
+            showNotification('心情修改成功！');
+        }
     } else {
-        moods.push({ date: today, mood: selectedMood, note, createdAt: new Date().toISOString() });
+        // 检查今天是否已打卡
+        const existingIndex = moods.findIndex(m => m.date === today);
+        
+        if (existingIndex !== -1) {
+            const existingMood = moods[existingIndex];
+            const result = await apiRequest(`/moods/${existingMood.id}`, 'PUT', moodData);
+            if (result) {
+                await fetchAllData();
+            }
+        } else {
+            const result = await apiRequest('/moods', 'POST', moodData);
+            if (result) {
+                await fetchAllData();
+            }
+        }
+        
+        showNotification('心情保存成功！');
     }
     
-    localStorage.setItem('loveMoods', JSON.stringify(moods));
     document.getElementById('mood-note').value = '';
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
     selectedMood = null;
-    renderMoods();
-    showNotification('心情保存成功！');
+}
+
+function editMood(id) {
+    const mood = moods.find(m => m.id === id);
+    if (!mood) {
+        showNotification('心情记录不存在');
+        return;
+    }
+    
+    editingMoodId = id;
+    selectedMood = mood.mood;
+    document.getElementById('mood-note').value = mood.note || '';
+    
+    // 选中对应的心情按钮
+    document.querySelectorAll('.mood-btn').forEach(btn => {
+        btn.classList.remove('selected');
+        if (btn.getAttribute('data-mood') === mood.mood) {
+            btn.classList.add('selected');
+        }
+    });
+    
+    showNotification('请修改心情记录');
+}
+
+async function deleteMood(id) {
+    if (confirm('确定要删除这个心情记录吗？')) {
+        const result = await apiRequest(`/moods/${id}`, 'DELETE');
+        if (result) {
+            await fetchAllData();
+            showNotification('心情记录已删除');
+        }
+    }
 }
 
 function renderMoods() {
@@ -528,6 +669,10 @@ function renderMoods() {
                 <div class="date">${formatDate(m.date)}</div>
                 ${m.note ? `<div class="note">${m.note}</div>` : ''}
             </div>
+            <div class="mood-actions">
+                <button class="btn btn-edit" onclick="editMood('${m.id}')">修改</button>
+                <button class="btn btn-delete" onclick="deleteMood('${m.id}')">删除</button>
+            </div>
         </div>
     `).join('');
 }
@@ -537,10 +682,27 @@ function toggleMusic() {
     const btn = document.getElementById('music-toggle');
     
     if (!bgMusic) {
-        // 使用免费的背景音乐URL
-        bgMusic = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+        // 尝试使用邹沛沛的《沉溺》作为背景音乐
+        // 由于版权保护，这里使用示例音频，用户可以自行替换为本地音频文件
+        // 建议用户下载邹沛沛的《沉溺》后，将文件名改为"chenni.mp3"并放在项目根目录
+        const musicSources = [
+            'chenni.mp3', // 本地文件（推荐）
+            'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' // 备用公共音乐
+        ];
+        
+        // 尝试加载本地文件
+        bgMusic = new Audio();
         bgMusic.loop = true;
         bgMusic.volume = 0.3;
+        
+        // 尝试第一个源
+        bgMusic.src = musicSources[0];
+        
+        // 如果加载失败，使用备用源
+        bgMusic.onerror = function() {
+            console.log('本地音乐文件未找到，使用备用音乐');
+            bgMusic.src = musicSources[1];
+        };
     }
     
     if (isMusicPlaying) {
@@ -548,8 +710,9 @@ function toggleMusic() {
         btn.textContent = '🎵';
         btn.classList.remove('playing');
     } else {
-        bgMusic.play().catch(() => {
-            alert('音乐播放失败，请检查网络连接');
+        bgMusic.play().catch((error) => {
+            console.error('音乐播放失败:', error);
+            alert('音乐播放失败，请检查网络连接或确保已将邹沛沛的《沉溺》音频文件命名为"chenni.mp3"并放在项目根目录');
         });
         btn.textContent = '🔊';
         btn.classList.add('playing');
@@ -558,27 +721,6 @@ function toggleMusic() {
 }
 
 // 设置功能
-function savePassword() {
-    const newPwd = document.getElementById('new-password').value;
-    const confirmPwd = document.getElementById('confirm-password').value;
-    
-    if (!newPwd) {
-        alert('请输入新密码');
-        return;
-    }
-    
-    if (newPwd !== confirmPwd) {
-        alert('两次输入的密码不一致');
-        return;
-    }
-    
-    password = newPwd;
-    localStorage.setItem('lovePassword', password);
-    document.getElementById('new-password').value = '';
-    document.getElementById('confirm-password').value = '';
-    showNotification('密码设置成功！');
-}
-
 function exportData() {
     const data = {
         memories,
@@ -600,41 +742,256 @@ function exportData() {
     showNotification('数据导出成功！');
 }
 
-function importData(e) {
+async function importData(e) {
     const file = e.target.files[0];
     if (!file) return;
     
     const reader = new FileReader();
-    reader.onload = function(event) {
+    reader.onload = async function(event) {
         try {
+            console.log('开始读取导入文件...');
             const data = JSON.parse(event.target.result);
-            if (data.memories) memories = data.memories;
-            if (data.anniversaries) anniversaries = data.anniversaries;
-            if (data.messages) messages = data.messages;
-            if (data.wishes) wishes = data.wishes;
-            if (data.moods) moods = data.moods;
-            if (data.loveStartDate) loveStartDate = data.loveStartDate;
+            console.log('文件解析成功，数据结构:', Object.keys(data));
             
-            localStorage.setItem('loveMemories', JSON.stringify(memories));
-            localStorage.setItem('loveAnniversaries', JSON.stringify(anniversaries));
-            localStorage.setItem('loveMessages', JSON.stringify(messages));
-            localStorage.setItem('loveWishes', JSON.stringify(wishes));
-            localStorage.setItem('loveMoods', JSON.stringify(moods));
-            localStorage.setItem('loveStartDate', loveStartDate);
+            let importedCount = 0;
+            let totalCount = 0;
+            let failedCount = 0;
             
-            location.reload();
+            // 计算总数据量
+            if (data.memories) totalCount += data.memories.length;
+            if (data.anniversaries) totalCount += data.anniversaries.length;
+            if (data.messages) totalCount += data.messages.length;
+            if (data.wishes) totalCount += data.wishes.length;
+            if (data.moods) totalCount += data.moods.length;
+            
+            showNotification(`开始导入 ${totalCount} 条数据...`);
+            console.log(`开始导入 ${totalCount} 条数据...`);
+            
+            // 导入记忆
+            if (data.memories && data.memories.length > 0) {
+                console.log(`导入记忆：${data.memories.length} 条`);
+                for (let i = 0; i < data.memories.length; i++) {
+                    const memory = data.memories[i];
+                    try {
+                        console.log(`导入记忆 ${i+1} 类型:`, memory.type);
+                        
+                        // 检查是否重复
+                        const isDuplicate = memories.some(m => 
+                            m.content === memory.content && 
+                            m.date === memory.date && 
+                            m.type === memory.type
+                        );
+                        
+                        if (isDuplicate) {
+                            console.log(`记忆 ${i+1}/${data.memories.length} 已存在，跳过导入`);
+                            continue;
+                        }
+                        
+                        // 移除可能导致问题的字段
+                        const { id, createdAt, updatedAt, ...memoryData } = memory;
+                        console.log(`记忆数据:`, JSON.stringify(memoryData, null, 2));
+                        const result = await apiRequest('/memories', 'POST', memoryData);
+                        if (result) {
+                            importedCount++;
+                            console.log(`记忆 ${i+1}/${data.memories.length} 导入成功`);
+                        } else {
+                            failedCount++;
+                            console.error(`记忆 ${i+1}/${data.memories.length} 导入失败：无响应`);
+                        }
+                    } catch (err) {
+                        failedCount++;
+                        console.error(`记忆 ${i+1}/${data.memories.length} 导入失败:`, err);
+                    }
+                }
+            }
+            
+            // 导入纪念日
+            if (data.anniversaries && data.anniversaries.length > 0) {
+                console.log(`导入纪念日：${data.anniversaries.length} 条`);
+                for (let i = 0; i < data.anniversaries.length; i++) {
+                    const anniversary = data.anniversaries[i];
+                    try {
+                        // 检查是否重复
+                        const isDuplicate = anniversaries.some(a => 
+                            a.name === anniversary.name && 
+                            a.date === anniversary.date
+                        );
+                        
+                        if (isDuplicate) {
+                            console.log(`纪念日 ${i+1}/${data.anniversaries.length} 已存在，跳过导入`);
+                            continue;
+                        }
+                        
+                        const { id, createdAt, updatedAt, ...anniversaryData } = anniversary;
+                        const result = await apiRequest('/anniversaries', 'POST', anniversaryData);
+                        if (result) {
+                            importedCount++;
+                            console.log(`纪念日 ${i+1}/${data.anniversaries.length} 导入成功`);
+                        } else {
+                            failedCount++;
+                            console.error(`纪念日 ${i+1}/${data.anniversaries.length} 导入失败：无响应`);
+                        }
+                    } catch (err) {
+                        failedCount++;
+                        console.error(`纪念日 ${i+1}/${data.anniversaries.length} 导入失败:`, err);
+                    }
+                }
+            }
+            
+            // 导入留言
+            if (data.messages && data.messages.length > 0) {
+                console.log(`导入留言：${data.messages.length} 条`);
+                for (let i = 0; i < data.messages.length; i++) {
+                    const message = data.messages[i];
+                    try {
+                        // 检查是否重复
+                        const isDuplicate = messages.some(m => 
+                            m.content === message.content && 
+                            m.mood === message.mood
+                        );
+                        
+                        if (isDuplicate) {
+                            console.log(`留言 ${i+1}/${data.messages.length} 已存在，跳过导入`);
+                            continue;
+                        }
+                        
+                        const { id, createdAt, updatedAt, ...messageData } = message;
+                        const result = await apiRequest('/messages', 'POST', messageData);
+                        if (result) {
+                            importedCount++;
+                            console.log(`留言 ${i+1}/${data.messages.length} 导入成功`);
+                        } else {
+                            failedCount++;
+                            console.error(`留言 ${i+1}/${data.messages.length} 导入失败：无响应`);
+                        }
+                    } catch (err) {
+                        failedCount++;
+                        console.error(`留言 ${i+1}/${data.messages.length} 导入失败:`, err);
+                    }
+                }
+            }
+            
+            // 导入愿望
+            if (data.wishes && data.wishes.length > 0) {
+                console.log(`导入愿望：${data.wishes.length} 条`);
+                for (let i = 0; i < data.wishes.length; i++) {
+                    const wish = data.wishes[i];
+                    try {
+                        console.log(`导入愿望 ${i+1}:`, wish.text);
+                        
+                        // 检查是否重复
+                        const isDuplicate = wishes.some(w => 
+                            w.text === wish.text
+                        );
+                        
+                        if (isDuplicate) {
+                            console.log(`愿望 ${i+1}/${data.wishes.length} 已存在，跳过导入`);
+                            continue;
+                        }
+                        
+                        // 移除可能导致问题的字段
+                        const { id, createdAt, updatedAt, ...wishData } = wish;
+                        console.log(`愿望数据:`, JSON.stringify(wishData, null, 2));
+                        const result = await apiRequest('/wishes', 'POST', wishData);
+                        if (result) {
+                            importedCount++;
+                            console.log(`愿望 ${i+1}/${data.wishes.length} 导入成功`);
+                        } else {
+                            failedCount++;
+                            console.error(`愿望 ${i+1}/${data.wishes.length} 导入失败：无响应`);
+                        }
+                    } catch (err) {
+                        failedCount++;
+                        console.error(`愿望 ${i+1}/${data.wishes.length} 导入失败:`, err);
+                    }
+                }
+            } else {
+                console.log('没有愿望数据需要导入');
+            }
+            
+            // 导入心情
+            if (data.moods && data.moods.length > 0) {
+                console.log(`导入心情：${data.moods.length} 条`);
+                for (let i = 0; i < data.moods.length; i++) {
+                    const mood = data.moods[i];
+                    try {
+                        // 检查是否重复
+                        const isDuplicate = moods.some(m => 
+                            m.date === mood.date
+                        );
+                        
+                        if (isDuplicate) {
+                            console.log(`心情 ${i+1}/${data.moods.length} 已存在，跳过导入`);
+                            continue;
+                        }
+                        
+                        const { id, createdAt, updatedAt, ...moodData } = mood;
+                        const result = await apiRequest('/moods', 'POST', moodData);
+                        if (result) {
+                            importedCount++;
+                            console.log(`心情 ${i+1}/${data.moods.length} 导入成功`);
+                        } else {
+                            failedCount++;
+                            console.error(`心情 ${i+1}/${data.moods.length} 导入失败：无响应`);
+                        }
+                    } catch (err) {
+                        failedCount++;
+                        console.error(`心情 ${i+1}/${data.moods.length} 导入失败:`, err);
+                    }
+                }
+            }
+            
+            // 导入恋爱开始日期
+            if (data.loveStartDate) {
+                loveStartDate = data.loveStartDate;
+                localStorage.setItem('loveStartDate', loveStartDate);
+                startLoveTimer();
+                console.log('恋爱开始日期导入成功:', loveStartDate);
+            }
+            
+            // 重新加载数据
+            console.log('导入完成，重新加载数据...');
+            await fetchAllData();
+            console.log(`导入完成！成功: ${importedCount}, 失败: ${failedCount}, 总计: ${totalCount}`);
+            showNotification(`导入完成！成功导入 ${importedCount} 条数据，失败 ${failedCount} 条（共 ${totalCount} 条）`);
         } catch (err) {
-            alert('导入失败，文件格式错误');
+            console.error('导入失败:', err);
+            showNotification(`导入失败：${err.message}`);
         }
     };
     reader.readAsText(file);
 }
 
-function clearAllData() {
+async function clearAllData() {
     if (confirm('确定要清除所有数据吗？此操作不可恢复！')) {
         if (confirm('再次确认：所有记忆、纪念日、留言等数据都将被删除！')) {
-            localStorage.clear();
-            location.reload();
+            // 并行删除所有数据
+            await Promise.all([
+                apiRequest('/memories/clear', 'DELETE'),
+                apiRequest('/anniversaries/clear', 'DELETE'),
+                apiRequest('/messages/clear', 'DELETE'),
+                apiRequest('/wishes/clear', 'DELETE'),
+                apiRequest('/moods/clear', 'DELETE')
+            ]);
+            
+            // 清空本地数据
+            memories = [];
+            anniversaries = [];
+            messages = [];
+            wishes = [];
+            moods = [];
+            
+            // 重新渲染页面
+            renderMemories();
+            renderAnniversaries();
+            renderCalendar();
+            renderMessages();
+            renderWishes();
+            renderMoods();
+            renderPhotoWall();
+            renderCountdown();
+            
+            showNotification('所有数据已清除！');
         }
     }
 }
@@ -850,6 +1207,10 @@ function startVoiceInput() {
 }
 
 // 语音留言
+let voiceMessageRecorder = null;
+let voiceMessageStream = null;
+let voiceMessageChunks = [];
+
 function startVoiceMessage() {
     if (!('MediaRecorder' in window) || !('navigator' in window) || !('mediaDevices' in navigator)) {
         alert('浏览器不支持语音录制\n\n建议使用：\n• Google Chrome\n• Microsoft Edge\n• Mozilla Firefox');
@@ -859,58 +1220,95 @@ function startVoiceMessage() {
     try {
         const btn = document.getElementById('voice-message-btn');
         
+        // 如果已经在录制，停止录制
+        if (btn.classList.contains('recording')) {
+            if (voiceMessageRecorder && voiceMessageRecorder.state === 'recording') {
+                voiceMessageRecorder.stop();
+            }
+            return;
+        }
+        
         btn.classList.add('recording');
         btn.textContent = '🔴';
         showNotification('请开始录制语音留言...');
         
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
-                const mediaRecorder = new MediaRecorder(stream);
-                const chunks = [];
+                voiceMessageStream = stream;
                 
-                mediaRecorder.start();
+                // 检查浏览器支持的音频格式
+                const options = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') 
+                    ? { mimeType: 'audio/ogg;codecs=opus' } 
+                    : MediaRecorder.isTypeSupported('audio/webm') 
+                    ? { mimeType: 'audio/webm' } 
+                    : {};
                 
-                mediaRecorder.ondataavailable = function(e) {
-                    chunks.push(e.data);
+                voiceMessageRecorder = new MediaRecorder(stream, options);
+                voiceMessageChunks = [];
+                
+                voiceMessageRecorder.start();
+                
+                voiceMessageRecorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) {
+                        voiceMessageChunks.push(e.data);
+                    }
                 };
                 
-                mediaRecorder.onstop = function() {
-                    const blob = new Blob(chunks, { type: 'audio/wav' });
-                    const reader = new FileReader();
-                    
-                    reader.onload = function(e) {
-                        const audioData = e.target.result;
-                        // 在留言内容中添加音频标记
-                        const textarea = document.getElementById('message-content');
-                        textarea.value += '[语音留言] ';
+                voiceMessageRecorder.onstop = function() {
+                    if (voiceMessageChunks.length > 0) {
+                        const blob = new Blob(voiceMessageChunks, { 
+                            type: voiceMessageRecorder.mimeType || 'audio/wav' 
+                        });
+                        const reader = new FileReader();
                         
-                        // 存储音频数据到localStorage或其他地方
-                        // 这里我们简化处理，将音频数据作为留言的一部分
-                        localStorage.setItem('voiceMessage_' + Date.now(), audioData);
-                        showNotification('语音留言录制成功！');
-                    };
+                        reader.onload = function(e) {
+                            const audioData = e.target.result;
+                            // 在留言内容中添加音频标记
+                            const textarea = document.getElementById('message-content');
+                            textarea.value += '[语音留言] ';
+                            
+                            // 存储音频数据到localStorage
+                            localStorage.setItem('voiceMessage_' + Date.now(), audioData);
+                            showNotification('语音留言录制成功！');
+                        };
+                        
+                        reader.readAsDataURL(blob);
+                    } else {
+                        showNotification('语音留言录制失败，没有录制到音频');
+                    }
                     
-                    reader.readAsDataURL(blob);
-                    
-                    stream.getTracks().forEach(track => track.stop());
+                    // 清理资源
+                    if (voiceMessageStream) {
+                        voiceMessageStream.getTracks().forEach(track => track.stop());
+                    }
                     btn.classList.remove('recording');
                     btn.textContent = '🎤';
+                    voiceMessageRecorder = null;
+                    voiceMessageStream = null;
+                    voiceMessageChunks = [];
+                };
+                
+                voiceMessageRecorder.onerror = function(error) {
+                    console.error('MediaRecorder错误:', error);
+                    showNotification('录音过程中出现错误');
+                    
+                    // 清理资源
+                    if (voiceMessageStream) {
+                        voiceMessageStream.getTracks().forEach(track => track.stop());
+                    }
+                    btn.classList.remove('recording');
+                    btn.textContent = '🎤';
+                    voiceMessageRecorder = null;
+                    voiceMessageStream = null;
+                    voiceMessageChunks = [];
                 };
                 
                 // 30秒后自动停止录制
                 setTimeout(() => {
-                    if (mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
+                    if (voiceMessageRecorder && voiceMessageRecorder.state === 'recording') {
+                        voiceMessageRecorder.stop();
                     }
                 }, 30000);
-                
-                // 点击按钮停止录制
-                btn.onclick = function() {
-                    if (mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                    }
-                    btn.onclick = startVoiceMessage;
-                };
             })
             .catch(error => {
                 console.error('获取麦克风权限失败:', error);
@@ -928,7 +1326,7 @@ function startVoiceMessage() {
 }
 
 // 添加记忆
-function addMemory() {
+async function addMemory() {
     const type = document.getElementById('memory-type').value;
     const content = document.getElementById('memory-content').value.trim();
     const isRange = document.getElementById('date-range-toggle').checked;
@@ -960,29 +1358,25 @@ function addMemory() {
         dateInfo = { isRange: false, date };
     }
     
-    const memory = {
-        id: Date.now(),
+    const memoryData = {
         type,
         content,
         date: dateInfo.date,
         dateRange: dateInfo.isRange ? { start: dateInfo.startDate, end: dateInfo.endDate } : null,
         locations: selectedLocations,
         photos: selectedPhotos.map(item => item.data || item),
-        tags: selectedTags,
-        createdAt: new Date().toISOString()
+        tags: selectedTags
     };
     
-    memories.push(memory);
-    localStorage.setItem('loveMemories', JSON.stringify(memories));
-    
-    resetMemoryForm();
-    renderMemories();
-    renderCalendar();
-    renderPhotoWall();
-    showNotification('记忆添加成功！');
+    const result = await apiRequest('/memories', 'POST', memoryData);
+    if (result) {
+        await fetchAllData();
+        resetMemoryForm();
+        showNotification('记忆添加成功！');
+    }
 }
 
-function updateMemory() {
+async function updateMemory() {
     const type = document.getElementById('memory-type').value;
     const content = document.getElementById('memory-content').value.trim();
     const isRange = document.getElementById('date-range-toggle').checked;
@@ -996,35 +1390,39 @@ function updateMemory() {
     if (isRange) {
         const start = document.getElementById('memory-start-date').value;
         const end = document.getElementById('memory-end-date').value;
-        if (!start || !end) return;
-        if (new Date(start) > new Date(end)) return;
+        if (!start || !end) {
+            alert('请选择日期');
+            return;
+        }
+        if (new Date(start) > new Date(end)) {
+            alert('开始日期不能晚于结束日期');
+            return;
+        }
         dateInfo = { isRange: true, startDate: start, endDate: end, date: start };
     } else {
         const date = document.getElementById('memory-date').value;
-        if (!date) return;
+        if (!date) {
+            alert('请选择日期');
+            return;
+        }
         dateInfo = { isRange: false, date };
     }
     
-    const idx = memories.findIndex(m => m.id === editingMemoryId);
-    if (idx !== -1) {
-        memories[idx] = {
-            ...memories[idx],
-            type,
-            content,
-            date: dateInfo.date,
-            dateRange: dateInfo.isRange ? { start: dateInfo.startDate, end: dateInfo.endDate } : null,
-            locations: selectedLocations,
-            photos: selectedPhotos.map(item => item.data || item),
-            tags: selectedTags,
-            updatedAt: new Date().toISOString()
-        };
-        
-        localStorage.setItem('loveMemories', JSON.stringify(memories));
+    const memoryData = {
+        type,
+        content,
+        date: dateInfo.date,
+        dateRange: dateInfo.isRange ? { start: dateInfo.startDate, end: dateInfo.endDate } : null,
+        locations: selectedLocations,
+        photos: selectedPhotos.map(item => item.data || item),
+        tags: selectedTags
+    };
+    
+    const result = await apiRequest(`/memories/${editingMemoryId}`, 'PUT', memoryData);
+    if (result) {
         editingMemoryId = null;
+        await fetchAllData();
         resetMemoryForm();
-        renderMemories();
-        renderCalendar();
-        renderPhotoWall();
         showNotification('记忆更新成功！');
     }
 }
@@ -1048,10 +1446,20 @@ function resetMemoryForm() {
 }
 
 function editMemory(id) {
+    if (!id) {
+        console.error('编辑记忆失败：ID不存在');
+        showNotification('编辑失败：无效的记忆ID');
+        return;
+    }
     const memory = memories.find(m => m.id === id);
-    if (!memory) return;
+    if (!memory) {
+        console.error('编辑记忆失败：记忆不存在');
+        showNotification('编辑失败：记忆不存在');
+        return;
+    }
     
     editingMemoryId = id;
+    console.log('开始编辑记忆：', id);
     document.getElementById('memory-form-title').textContent = '编辑记忆';
     document.getElementById('memory-submit-btn').textContent = '更新记忆';
     document.getElementById('memory-type').value = memory.type;
@@ -1091,14 +1499,19 @@ function editMemory(id) {
     showPage('add-memory');
 }
 
-function deleteMemory(id) {
+async function deleteMemory(id) {
+    if (!id) {
+        console.error('删除记忆失败：ID不存在');
+        showNotification('删除失败：无效的记忆ID');
+        return;
+    }
     if (confirm('确定要删除这个记忆吗？')) {
-        memories = memories.filter(m => m.id !== id);
-        localStorage.setItem('loveMemories', JSON.stringify(memories));
-        renderMemories();
-        renderCalendar();
-        renderPhotoWall();
-        showNotification('记忆已删除');
+        console.log('删除记忆：', id);
+        const result = await apiRequest(`/memories/${id}`, 'DELETE');
+        if (result) {
+            await fetchAllData();
+            showNotification('记忆已删除');
+        }
     }
 }
 
@@ -1193,8 +1606,8 @@ function renderMemories() {
                 ${photoGallery}
                 <p class="date">${dateDisplay}</p>
                 <div class="memory-actions">
-                    <button class="btn btn-edit" onclick="editMemory(${m.id})">修改</button>
-                    <button class="btn btn-delete" onclick="deleteMemory(${m.id})">删除</button>
+                    <button class="btn btn-edit" onclick="editMemory('${m.id}')">修改</button>
+                    <button class="btn btn-delete" onclick="deleteMemory('${m.id}')">删除</button>
                 </div>
             </div>
         `;
@@ -1202,7 +1615,7 @@ function renderMemories() {
 }
 
 // 纪念日功能
-function addAnniversary() {
+async function addAnniversary() {
     const name = document.getElementById('anniversary-name').value.trim();
     const date = document.getElementById('anniversary-date').value;
     const desc = document.getElementById('anniversary-description').value.trim();
@@ -1212,33 +1625,42 @@ function addAnniversary() {
         return;
     }
     
-    anniversaries.push({ id: Date.now(), name, date, description: desc, createdAt: new Date().toISOString() });
-    localStorage.setItem('loveAnniversaries', JSON.stringify(anniversaries));
+    const anniversaryData = {
+        name,
+        date,
+        description: desc
+    };
     
-    document.getElementById('anniversary-name').value = '';
-    document.getElementById('anniversary-description').value = '';
-    renderAnniversaries();
-    renderCalendar();
-    renderCountdown();
-    showNotification('纪念日添加成功！');
+    const result = await apiRequest('/anniversaries', 'POST', anniversaryData);
+    if (result) {
+        await fetchAllData();
+        document.getElementById('anniversary-name').value = '';
+        document.getElementById('anniversary-description').value = '';
+        showNotification('纪念日添加成功！');
+    }
 }
 
-function updateAnniversary() {
+async function updateAnniversary() {
     const name = document.getElementById('anniversary-name').value.trim();
     const date = document.getElementById('anniversary-date').value;
     const desc = document.getElementById('anniversary-description').value.trim();
     
-    if (!name || !date) return;
+    if (!name || !date) {
+        alert('请输入名称和日期');
+        return;
+    }
     
-    const idx = anniversaries.findIndex(a => a.id === editingAnniversaryId);
-    if (idx !== -1) {
-        anniversaries[idx] = { ...anniversaries[idx], name, date, description: desc, updatedAt: new Date().toISOString() };
-        localStorage.setItem('loveAnniversaries', JSON.stringify(anniversaries));
+    const anniversaryData = {
+        name,
+        date,
+        description: desc
+    };
+    
+    const result = await apiRequest(`/anniversaries/${editingAnniversaryId}`, 'PUT', anniversaryData);
+    if (result) {
         editingAnniversaryId = null;
+        await fetchAllData();
         resetAnniversaryForm();
-        renderAnniversaries();
-        renderCalendar();
-        renderCountdown();
         showNotification('纪念日更新成功！');
     }
 }
@@ -1250,10 +1672,20 @@ function resetAnniversaryForm() {
 }
 
 function editAnniversary(id) {
+    if (!id) {
+        console.error('编辑纪念日失败：ID不存在');
+        showNotification('编辑失败：无效的纪念日ID');
+        return;
+    }
     const a = anniversaries.find(x => x.id === id);
-    if (!a) return;
+    if (!a) {
+        console.error('编辑纪念日失败：纪念日不存在');
+        showNotification('编辑失败：纪念日不存在');
+        return;
+    }
     
     editingAnniversaryId = id;
+    console.log('开始编辑纪念日：', id);
     document.getElementById('anniversary-form-title').textContent = '编辑纪念日';
     document.getElementById('anniversary-submit-btn').textContent = '更新纪念日';
     document.getElementById('anniversary-name').value = a.name;
@@ -1261,14 +1693,13 @@ function editAnniversary(id) {
     document.getElementById('anniversary-description').value = a.description || '';
 }
 
-function deleteAnniversary(id) {
+async function deleteAnniversary(id) {
     if (confirm('确定要删除这个纪念日吗？')) {
-        anniversaries = anniversaries.filter(a => a.id !== id);
-        localStorage.setItem('loveAnniversaries', JSON.stringify(anniversaries));
-        renderAnniversaries();
-        renderCalendar();
-        renderCountdown();
-        showNotification('纪念日已删除');
+        const result = await apiRequest(`/anniversaries/${id}`, 'DELETE');
+        if (result) {
+            await fetchAllData();
+            showNotification('纪念日已删除');
+        }
     }
 }
 
@@ -1309,8 +1740,8 @@ function renderAnniversaries() {
                 <p>${a.description || '无描述'}</p>
                 <p class="days-left">距离今年还有 ${daysLeft} 天</p>
                 <div class="anniversary-actions">
-                    <button class="btn btn-edit" onclick="editAnniversary(${a.id})">修改</button>
-                    <button class="btn btn-delete" onclick="deleteAnniversary(${a.id})">删除</button>
+                    <button class="btn btn-edit" onclick="editAnniversary('${a.id}')">修改</button>
+                    <button class="btn btn-delete" onclick="deleteAnniversary('${a.id}')">删除</button>
                 </div>
             </div>
         `;
@@ -1318,7 +1749,7 @@ function renderAnniversaries() {
 }
 
 // 留言功能
-function addMessage() {
+async function addMessage() {
     const content = document.getElementById('message-content').value.trim();
     const mood = document.getElementById('message-mood').value;
     
@@ -1329,19 +1760,19 @@ function addMessage() {
     
     const moodNames = { love: '❤️ 爱你', miss: '💕 想你', happy: '😊 开心', thanks: '🙏 感谢', sorry: '😔 抱歉', other: '💭 其他' };
     
-    messages.push({ 
-        id: Date.now(), 
-        content, 
-        mood: moodNames[mood], 
-        createdAt: new Date().toISOString(),
+    const messageData = {
+        content,
+        mood: moodNames[mood],
         hasVoice: content.includes('[语音留言]')
-    });
-    localStorage.setItem('loveMessages', JSON.stringify(messages));
+    };
     
-    document.getElementById('message-content').value = '';
-    document.getElementById('message-mood').value = 'love';
-    renderMessages();
-    showNotification('留言发送成功！');
+    const result = await apiRequest('/messages', 'POST', messageData);
+    if (result) {
+        await fetchAllData();
+        document.getElementById('message-content').value = '';
+        document.getElementById('message-mood').value = 'love';
+        showNotification('留言发送成功！');
+    }
 }
 
 function renderMessages() {
@@ -1362,19 +1793,20 @@ function renderMessages() {
                 ${m.hasVoice ? '<audio controls style="width:100%;margin:10px 0;"><source src="" type="audio/wav">您的浏览器不支持音频播放。</audio>' : ''}
                 <div class="message-mood">心情：${m.mood}</div>
                 <div class="message-actions">
-                    <button class="btn btn-delete" onclick="deleteMessage(${m.id})">删除</button>
+                    <button class="btn btn-delete" onclick="deleteMessage('${m.id}')">删除</button>
                 </div>
             </div>
         `;
     }).join('');
 }
 
-function deleteMessage(id) {
+async function deleteMessage(id) {
     if (confirm('确定要删除这条留言吗？')) {
-        messages = messages.filter(m => m.id !== id);
-        localStorage.setItem('loveMessages', JSON.stringify(messages));
-        renderMessages();
-        showNotification('留言已删除');
+        const result = await apiRequest(`/messages/${id}`, 'DELETE');
+        if (result) {
+            await fetchAllData();
+            showNotification('留言已删除');
+        }
     }
 }
 
@@ -1402,18 +1834,18 @@ function renderStats() {
     const typeChart = document.getElementById('memory-type-chart');
     
     if (Object.keys(typeStats).length === 0) {
-        typeChart.innerHTML = '<p>还没有记忆数据</p>';
+        typeChart.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.6rem;">还没有记忆数据</p>';
     } else {
         typeChart.innerHTML = Object.entries(typeStats).map(([type, count]) => {
             const percentage = ((count / memories.length) * 100).toFixed(0);
             return `
-                <div style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>${typeNames[type]}</span>
-                        <span>${count} (${percentage}%)</span>
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.6rem;">
+                        <span style="color: var(--text-color);">${typeNames[type]}</span>
+                        <span style="color: var(--accent-color); font-weight: bold;">${count} (${percentage}%)</span>
                     </div>
-                    <div style="height: 8px; background-color: #ddd; border-radius: 4px;">
-                        <div style="height: 100%; width: ${percentage}%; background-color: var(--accent-color); border-radius: 4px;"></div>
+                    <div style="height: 10px; background-color: rgba(0,0,0,0.1); border-radius: 5px; overflow: hidden;">
+                        <div style="height: 100%; width: ${percentage}%; background: linear-gradient(90deg, var(--primary-color), var(--accent-color)); border-radius: 5px; transition: width 0.5s ease;"></div>
                     </div>
                 </div>
             `;
@@ -1432,16 +1864,16 @@ function renderStats() {
     
     const locationStatsEl = document.getElementById('location-stats');
     if (Object.keys(locationStats).length === 0) {
-        locationStatsEl.innerHTML = '<p>还没有地点数据</p>';
+        locationStatsEl.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.6rem;">还没有地点数据</p>';
     } else {
         const sortedLocations = Object.entries(locationStats)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);
+            .slice(0, 15); // 显示前15个地点
         
         locationStatsEl.innerHTML = sortedLocations.map(([name, count]) => `
-            <div class="stats-list-item">
-                <span class="item-name">${name}</span>
-                <span class="item-count">${count}次</span>
+            <div class="stats-list-item" style="padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.1); transition: background-color 0.2s ease;">
+                <span class="item-name" style="font-size: 0.6rem; color: var(--text-color);">${name}</span>
+                <span class="item-count" style="font-size: 0.6rem; color: var(--accent-color); font-weight: bold;">${count}次</span>
             </div>
         `).join('');
     }
@@ -1458,16 +1890,16 @@ function renderStats() {
     
     const tagStatsEl = document.getElementById('tag-stats');
     if (Object.keys(tagStats).length === 0) {
-        tagStatsEl.innerHTML = '<p>还没有标签数据</p>';
+        tagStatsEl.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.6rem;">还没有标签数据</p>';
     } else {
         const sortedTags = Object.entries(tagStats)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);
+            .slice(0, 15); // 显示前15个标签
         
         tagStatsEl.innerHTML = sortedTags.map(([tag, count]) => `
-            <div class="stats-list-item">
-                <span class="item-name">${tag}</span>
-                <span class="item-count">${count}次</span>
+            <div class="stats-list-item" style="padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.1); transition: background-color 0.2s ease;">
+                <span class="item-name" style="font-size: 0.6rem; color: var(--text-color);">${tag}</span>
+                <span class="item-count" style="font-size: 0.6rem; color: var(--accent-color); font-weight: bold;">${count}次</span>
             </div>
         `).join('');
     }
@@ -1475,7 +1907,7 @@ function renderStats() {
     // 时间分布
     const timeDistribution = document.getElementById('time-distribution');
     if (memories.length === 0) {
-        timeDistribution.innerHTML = '<p>还没有记忆数据</p>';
+        timeDistribution.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.6rem;">还没有记忆数据</p>';
     } else {
         // 按月份统计
         const monthlyStats = Array(12).fill(0);
@@ -1487,15 +1919,17 @@ function renderStats() {
             monthlyStats[month]++;
         });
         
+        const maxCount = Math.max(...monthlyStats);
+        
         timeDistribution.innerHTML = `
-            <div style="width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: space-around;">
+            <div style="width: 100%; height: 200px; display: flex; align-items: flex-end; justify-content: space-around; padding: 20px 0;">
                 ${monthlyStats.map((count, index) => {
-                    const height = count > 0 ? (count / Math.max(...monthlyStats)) * 80 : 5;
+                    const height = count > 0 ? (count / maxCount) * 150 : 10;
                     return `
-                        <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
-                            <div style="width: 20px; height: ${height}%; background-color: var(--accent-color); border-radius: 2px 2px 0 0;"></div>
-                            <span style="font-size: 0.4rem;">${monthNames[index]}</span>
-                            <span style="font-size: 0.4rem; color: var(--accent-color);">${count}</span>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; max-width: 40px;">
+                            <div style="width: 25px; height: ${height}px; background: linear-gradient(180deg, var(--primary-color), var(--accent-color)); border-radius: 4px 4px 0 0; transition: height 0.5s ease;"></div>
+                            <span style="font-size: 0.5rem; color: var(--text-color); text-align: center;">${monthNames[index]}</span>
+                            <span style="font-size: 0.5rem; color: var(--accent-color); font-weight: bold;">${count}</span>
                         </div>
                     `;
                 }).join('')}
@@ -1549,11 +1983,60 @@ function getAIResponse(query) {
     }
     
     if (query.includes('约会') || query.includes('推荐')) {
-        if (locations.length === 0) return '你们还没有记录去过的地方呢！📍\n\n推荐：可以尝试去公园、咖啡厅、电影院等地方约会哦！';
+        // 预设的约会活动和地点
+        const dateActivities = [
+            '一起做手工DIY',
+            '去看一场电影',
+            '逛美术馆或博物馆',
+            '一起做饭或烘焙',
+            '去公园野餐',
+            '骑自行车或散步',
+            '去游乐场',
+            '看一场音乐会或演出',
+            '去书店或图书馆',
+            '一起做运动（羽毛球、乒乓球等）'
+        ];
+        
+        const datePlaces = [
+            '温馨的咖啡厅',
+            '环境优美的公园',
+            '特色餐厅',
+            '海边或湖边',
+            '山顶或观景台',
+            '主题展览',
+            '特色街区或古镇',
+            '温泉或SPA',
+            '植物园或动物园',
+            '创意园区'
+        ];
+        
+        if (locations.length === 0) {
+            // 随机推荐几个活动和地点
+            const randomActivities = dateActivities.sort(() => 0.5 - Math.random()).slice(0, 3);
+            const randomPlaces = datePlaces.sort(() => 0.5 - Math.random()).slice(0, 3);
+            
+            let resp = '推荐约会活动：\n\n';
+            randomActivities.forEach((activity, i) => { resp += `${i + 1}. ${activity}\n`; });
+            resp += '\n推荐约会地点：\n\n';
+            randomPlaces.forEach((place, i) => { resp += `${i + 1}. ${place}\n`; });
+            return resp + '\n💡 建议：根据天气和心情选择适合的活动，创造美好的回忆！';
+        }
+        
         const unique = [...new Set(locations)];
         let resp = `你们去过的地方：\n\n`;
-        unique.slice(0, 5).forEach((l, i) => { resp += `${i + 1}. ${l}\n`; });
-        return resp + '\n💡 建议：可以尝试探索新的地方，创造更多新鲜感！';
+        unique.slice(0, 3).forEach((l, i) => { resp += `${i + 1}. ${l}\n`; });
+        
+        // 推荐新的活动和地点
+        const randomActivities = dateActivities.sort(() => 0.5 - Math.random()).slice(0, 3);
+        const randomPlaces = datePlaces.sort(() => 0.5 - Math.random()).slice(0, 3);
+        
+        resp += '\n推荐尝试的活动：\n\n';
+        randomActivities.forEach((activity, i) => { resp += `${i + 1}. ${activity}\n`; });
+        
+        resp += '\n推荐探索的新地点：\n\n';
+        randomPlaces.forEach((place, i) => { resp += `${i + 1}. ${place}\n`; });
+        
+        return resp + '\n💡 建议：偶尔尝试不同的约会方式，可以让感情更加新鲜有趣！';
     }
     
     if (query.includes('爱好') || query.includes('共同')) {
