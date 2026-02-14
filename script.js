@@ -1896,9 +1896,10 @@ async function addMemory() {
     };
     await saveToGist(saveData);
     
-    // 重新加载数据
-    await fetchAllData();
+    // 重置表单并重新渲染
     resetMemoryForm();
+    renderMemories();
+    renderPhotoWall();
     showNotification('记忆添加成功！');
 }
 
@@ -1960,10 +1961,11 @@ async function updateMemory() {
         };
         await saveToGist(saveData);
         
-        // 重新加载数据
+        // 重置表单并重新渲染
         editingMemoryId = null;
-        await fetchAllData();
         resetMemoryForm();
+        renderMemories();
+        renderPhotoWall();
         showNotification('记忆更新成功！');
     } else {
         showNotification('记忆更新失败：记忆不存在');
@@ -2030,7 +2032,16 @@ function editMemory(id) {
     }
     
     if (memory.photos && memory.photos.length > 0) {
-        selectedPhotos = [...memory.photos];
+        // 将已有照片转换为统一格式
+        selectedPhotos = memory.photos.map(photo => {
+            if (typeof photo === 'string') {
+                return { data: photo, type: 'image/jpeg' };
+            }
+            return photo;
+        });
+        renderSelectedPhotos();
+    } else {
+        selectedPhotos = [];
         renderSelectedPhotos();
     }
     
