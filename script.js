@@ -1617,8 +1617,14 @@ function renderSelectedTags() {
 
 // 语音输入
 function startVoiceInput() {
+    // 检查是否在安全环境下运行
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        alert('语音输入需要HTTPS环境或本地访问\n\n当前协议: ' + location.protocol + '\n\n解决方案：\n1. 使用本地文件访问\n2. 部署到HTTPS服务器\n3. 使用GitHub Pages');
+        return;
+    }
+    
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert('浏览器不支持语音输入\n\n建议使用：\n• Google Chrome\n• Microsoft Edge\n• Mozilla Firefox');
+        alert('浏览器不支持语音输入\n\n建议使用：\n• Google Chrome\n• Microsoft Edge\n• Safari');
         return;
     }
     
@@ -1629,23 +1635,38 @@ function startVoiceInput() {
         const textarea = document.getElementById('memory-content');
         
         recognition.lang = 'zh-CN';
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         
         btn.classList.add('recording');
         btn.textContent = '🔴';
-        showNotification('请开始说话...');
+        showNotification('🎤 正在聆听，请开始说话...');
         recognition.start();
         
+        let finalTranscript = '';
+        
         recognition.onresult = function(e) {
-            const transcript = e.results[0][0].transcript;
-            textarea.value += transcript;
-            showNotification('语音输入成功！');
+            let interimTranscript = '';
+            
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const transcript = e.results[i][0].transcript;
+                if (e.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            
+            // 显示实时识别结果
+            textarea.value = finalTranscript + interimTranscript;
         };
         
         recognition.onend = function() {
             btn.classList.remove('recording');
             btn.textContent = '🎤';
+            if (finalTranscript) {
+                showNotification('语音输入完成！');
+            }
         };
         
         recognition.onerror = function(event) {
@@ -1654,16 +1675,22 @@ function startVoiceInput() {
             
             switch(event.error) {
                 case 'no-speech':
-                    errorMessage = '没有检测到语音';
+                    errorMessage = '没有检测到语音，请重试';
                     break;
                 case 'audio-capture':
-                    errorMessage = '无法访问麦克风';
+                    errorMessage = '无法访问麦克风，请检查设备';
                     break;
                 case 'not-allowed':
-                    errorMessage = '麦克风权限被拒绝';
+                    errorMessage = '麦克风权限被拒绝，请在浏览器设置中允许访问麦克风';
                     break;
                 case 'aborted':
                     errorMessage = '语音输入被中止';
+                    break;
+                case 'network':
+                    errorMessage = '网络错误，请检查网络连接';
+                    break;
+                case 'service-not-allowed':
+                    errorMessage = '语音服务不可用，请使用HTTPS或本地访问';
                     break;
             }
             
@@ -1671,6 +1698,18 @@ function startVoiceInput() {
             btn.classList.remove('recording');
             btn.textContent = '🎤';
         };
+        
+        // 10秒后自动停止
+        setTimeout(() => {
+            if (recognition) {
+                try {
+                    recognition.stop();
+                } catch (e) {
+                    console.log('停止语音识别');
+                }
+            }
+        }, 10000);
+        
     } catch (error) {
         console.error('语音输入初始化错误:', error);
         alert('语音输入初始化失败\n\n' + error.message);
