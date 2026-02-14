@@ -170,34 +170,55 @@ function loadFromLocalStorage(key) {
 
 async function fetchAllData() {
     try {
-        // 尝试从GitHub Gist加载数据
-        console.log('从GitHub Gist加载数据...');
-        const gistData = await loadFromGist();
+        const token = getGitHubToken();
         
-        if (gistData) {
-            // 使用Gist数据
-            memories = gistData.memories || [];
-            anniversaries = gistData.anniversaries || [];
-            messages = gistData.messages || [];
-            wishes = gistData.wishes || [];
-            moods = gistData.moods || [];
+        // 如果有Token，优先从GitHub Gist加载数据
+        if (token) {
+            console.log('检测到GitHub Token，优先从GitHub Gist加载数据...');
+            const gistData = await loadFromGist();
             
-            // 保存到本地存储作为备份
-            saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
-            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
-            saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
-            saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
-            saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
-            
-            showNotification('数据加载成功，已同步到GitHub Gist');
+            if (gistData) {
+                // 使用Gist数据
+                memories = gistData.memories || [];
+                anniversaries = gistData.anniversaries || [];
+                messages = gistData.messages || [];
+                wishes = gistData.wishes || [];
+                moods = gistData.moods || [];
+                loveStartDate = gistData.loveStartDate || null;
+                
+                // 保存到本地存储作为备份
+                saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
+                saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
+                saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+                saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
+                saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
+                if (loveStartDate) {
+                    localStorage.setItem('loveStartDate', loveStartDate);
+                }
+                
+                showNotification('数据已从云端同步');
+                console.log('从GitHub Gist加载数据成功');
+            } else {
+                // Gist加载失败，从本地存储加载
+                console.log('GitHub Gist无数据，从本地存储加载...');
+                memories = loadFromLocalStorage(STORAGE_KEYS.MEMORIES);
+                anniversaries = loadFromLocalStorage(STORAGE_KEYS.ANNIVERSARIES);
+                messages = loadFromLocalStorage(STORAGE_KEYS.MESSAGES);
+                wishes = loadFromLocalStorage(STORAGE_KEYS.WISHES);
+                moods = loadFromLocalStorage(STORAGE_KEYS.MOODS);
+                loveStartDate = localStorage.getItem('loveStartDate');
+                
+                showNotification('云端无数据，使用本地数据');
+            }
         } else {
-            // Gist加载失败，从本地存储加载
-            console.log('从本地存储加载数据...');
+            // 没有Token，从本地存储加载
+            console.log('未设置GitHub Token，从本地存储加载...');
             memories = loadFromLocalStorage(STORAGE_KEYS.MEMORIES);
             anniversaries = loadFromLocalStorage(STORAGE_KEYS.ANNIVERSARIES);
             messages = loadFromLocalStorage(STORAGE_KEYS.MESSAGES);
             wishes = loadFromLocalStorage(STORAGE_KEYS.WISHES);
             moods = loadFromLocalStorage(STORAGE_KEYS.MOODS);
+            loveStartDate = localStorage.getItem('loveStartDate');
             
             showNotification('使用本地存储数据');
         }
