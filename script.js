@@ -2077,15 +2077,45 @@ async function deleteMemory(id) {
 
 function handlePhotoUpload(e) {
     const files = e.target.files;
+    if (!files || files.length === 0) {
+        console.log('没有选择文件');
+        return;
+    }
+    
+    const maxSize = 10 * 1024 * 1024; // 10MB限制
+    
     for (let file of files) {
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue;
+        console.log('处理文件:', file.name, '类型:', file.type, '大小:', file.size);
+        
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+            showNotification(`文件 ${file.name} 不是图片或视频格式`);
+            continue;
+        }
+        
+        if (file.size > maxSize) {
+            showNotification(`文件 ${file.name} 太大（超过10MB），请压缩后上传`);
+            continue;
+        }
+        
         const reader = new FileReader();
-        reader.onload = function(e) {
-            selectedPhotos.push({ data: e.target.result, type: file.type });
+        
+        reader.onload = function(event) {
+            console.log('文件读取成功:', file.name);
+            selectedPhotos.push({ data: event.target.result, type: file.type, name: file.name });
             renderSelectedPhotos();
+            showNotification(`照片 ${file.name} 上传成功`);
         };
+        
+        reader.onerror = function(error) {
+            console.error('文件读取失败:', error);
+            showNotification(`文件 ${file.name} 读取失败`);
+        };
+        
         reader.readAsDataURL(file);
     }
+    
+    // 清空input，允许重复选择同一文件
+    e.target.value = '';
 }
 
 function renderSelectedPhotos() {
@@ -2093,21 +2123,28 @@ function renderSelectedPhotos() {
     if (!gallery) {
         gallery = document.createElement('div');
         gallery.className = 'photo-gallery';
+        gallery.style.cssText = 'display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;';
         document.getElementById('photo-upload-container').appendChild(gallery);
     }
+    
+    if (selectedPhotos.length === 0) {
+        gallery.innerHTML = '<p style="color: #999; font-size: 0.6rem;">暂无选择的照片</p>';
+        return;
+    }
+    
     gallery.innerHTML = selectedPhotos.map((item, i) => {
         if (item.type && item.type.startsWith('video/')) {
             return `
-                <div class="photo-item">
-                    <video src="${item.data}" alt="视频" controls style="width:100%;height:100%;object-fit:cover;"></video>
-                    <button class="delete-photo" onclick="deletePhoto(${i})">×</button>
+                <div class="photo-item" style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden;">
+                    <video src="${item.data}" controls style="width:100%;height:100%;object-fit:cover;"></video>
+                    <button class="delete-photo" onclick="deletePhoto(${i})" style="position: absolute; top: 2px; right: 2px; background: rgba(255,0,0,0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button>
                 </div>
             `;
         } else {
             return `
-                <div class="photo-item">
-                    <img src="${item.data || item}" alt="照片">
-                    <button class="delete-photo" onclick="deletePhoto(${i})">×</button>
+                <div class="photo-item" style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden;">
+                    <img src="${item.data || item}" alt="照片" style="width:100%;height:100%;object-fit:cover;">
+                    <button class="delete-photo" onclick="deletePhoto(${i})" style="position: absolute; top: 2px; right: 2px; background: rgba(255,0,0,0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button>
                 </div>
             `;
         }
