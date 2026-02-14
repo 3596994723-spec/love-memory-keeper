@@ -486,9 +486,19 @@
                 <p class="settings-hint">手动同步数据到云端或从云端下载</p>
                 <button class="btn" id="upload-to-cloud-btn" style="background: #27ae60;">📤 上传数据到云端</button>
                 <button class="btn" id="download-from-cloud-btn" style="margin-left: 10px; background: #3498db;">📥 从云端下载</button>
+                <div style="margin-top: 15px;">
+                    <p class="settings-hint" style="font-size: 0.5rem;">
+                        <strong>云端数据ID：</strong><span id="gist-id-display" style="color: #27ae60;">未创建</span>
+                    </p>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <input type="text" id="gist-id-input" placeholder="输入云端数据ID（换设备时使用）" style="width: 100%; margin-bottom: 5px;">
+                    </div>
+                    <button class="btn" id="save-gist-id-btn" style="font-size: 0.5rem;">保存ID</button>
+                    <button class="btn" id="copy-gist-id-btn" style="margin-left: 5px; font-size: 0.5rem; background: #9b59b6;">复制ID</button>
+                </div>
                 <p class="settings-hint" style="margin-top: 10px; font-size: 0.5rem;">
-                    提示：上传会将当前设备的数据覆盖云端数据<br>
-                    下载会用云端数据覆盖当前设备的数据
+                    💡 提示：上传后会自动生成云端数据ID<br>
+                    换设备时，先输入相同的ID，再点击下载
                 </p>
             </div>
             
@@ -549,6 +559,6 @@
         </div>
     </div>
     
-    <script src="script.js?v=20260214v5"></script>
+    <script src="script.js?v=20260214v6"></script>
 </body>
 </html>

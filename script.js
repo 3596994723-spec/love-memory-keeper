@@ -149,7 +149,9 @@ async function uploadToCloud() {
     
     const success = await saveToGist(saveData);
     if (success) {
-        showNotification('数据已成功上传到云端！');
+        updateGistIdDisplay();
+        const gistId = localStorage.getItem('gistId');
+        showNotification(`数据已成功上传到云端！ID: ${gistId}`);
     } else {
         showNotification('上传失败，请检查Token是否正确');
     }
@@ -201,6 +203,23 @@ async function downloadFromCloud() {
         showNotification('数据已从云端下载成功！');
     } else {
         showNotification('云端暂无数据或下载失败');
+    }
+}
+
+// 更新Gist ID显示
+function updateGistIdDisplay() {
+    const gistId = localStorage.getItem('gistId');
+    const displayEl = document.getElementById('gist-id-display');
+    const inputEl = document.getElementById('gist-id-input');
+    
+    if (gistId) {
+        displayEl.textContent = gistId;
+        displayEl.style.color = '#27ae60';
+        if (inputEl) inputEl.placeholder = '已设置ID（可复制分享给其他设备）';
+    } else {
+        displayEl.textContent = '未创建';
+        displayEl.style.color = '#e74c3c';
+        if (inputEl) inputEl.placeholder = '输入云端数据ID（换设备时使用）';
     }
 }
 
@@ -596,6 +615,39 @@ function bindAllEvents() {
     document.getElementById('export-data-btn').addEventListener('click', exportData);
     document.getElementById('import-data-input').addEventListener('change', importData);
     document.getElementById('clear-data-btn').addEventListener('click', clearAllData);
+    
+    // Gist ID管理
+    document.getElementById('save-gist-id-btn').addEventListener('click', function() {
+        const gistId = document.getElementById('gist-id-input').value.trim();
+        if (gistId) {
+            localStorage.setItem('gistId', gistId);
+            updateGistIdDisplay();
+            showNotification('云端数据ID已保存');
+        } else {
+            showNotification('请输入有效的ID');
+        }
+    });
+    
+    document.getElementById('copy-gist-id-btn').addEventListener('click', function() {
+        const gistId = localStorage.getItem('gistId');
+        if (gistId) {
+            navigator.clipboard.writeText(gistId).then(() => {
+                showNotification('ID已复制到剪贴板');
+            }).catch(() => {
+                // 备用复制方法
+                const input = document.getElementById('gist-id-input');
+                input.value = gistId;
+                input.select();
+                document.execCommand('copy');
+                showNotification('ID已复制');
+            });
+        } else {
+            showNotification('暂无云端数据ID');
+        }
+    });
+    
+    // 初始化显示Gist ID
+    updateGistIdDisplay();
     
     // 加载恋爱开始日期到设置页面
     if (loveStartDate) {
