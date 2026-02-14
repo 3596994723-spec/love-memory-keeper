@@ -21,15 +21,7 @@ try {
     showNotification('Firebase初始化失败，使用本地存储模式');
 }
 
-// 本地存储键名
-const STORAGE_KEYS = {
-    MEMORIES: 'loveMemories',
-    ANNIVERSARIES: 'loveAnniversaries',
-    MESSAGES: 'loveMessages',
-    WISHES: 'loveWishes',
-    MOODS: 'loveMoods',
-    LOVE_START_DATE: 'loveStartDate'
-};
+
 
 // 全局变量
 let memories = [];
