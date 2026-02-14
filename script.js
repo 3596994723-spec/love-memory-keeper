@@ -12,7 +12,7 @@ let currentTheme = localStorage.getItem('loveTheme') || 'pink';
 let currentDate = new Date();
 
 // HTTP 请求函数
-async function apiRequest(endpoint, method = 'GET', data = null) {
+async function apiRequest(endpoint, method = 'GET', data = null, retryCount = 0) {
     const url = `${API_BASE_URL}${endpoint}`;
     const options = {
         method,
@@ -37,6 +37,12 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         return result;
     } catch (error) {
         console.error('API request failed:', error);
+        // 最多重试2次
+        if (retryCount < 2) {
+            console.log(`重试请求 (${retryCount + 1}/2)...`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒后重试
+            return apiRequest(endpoint, method, data, retryCount + 1);
+        }
         showNotification(`网络请求失败: ${error.message}`);
         return null;
     }
