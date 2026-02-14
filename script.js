@@ -124,6 +124,86 @@ async function loadFromGist() {
     }
 }
 
+// 上传数据到云端
+async function uploadToCloud() {
+    const token = getGitHubToken();
+    if (!token) {
+        showNotification('请先设置GitHub Token');
+        return;
+    }
+    
+    if (!confirm('确定要将当前数据上传到云端吗？这将覆盖云端的数据。')) {
+        return;
+    }
+    
+    showNotification('正在上传数据到云端...');
+    
+    const saveData = {
+        memories,
+        anniversaries,
+        messages,
+        wishes,
+        moods,
+        loveStartDate
+    };
+    
+    const success = await saveToGist(saveData);
+    if (success) {
+        showNotification('数据已成功上传到云端！');
+    } else {
+        showNotification('上传失败，请检查Token是否正确');
+    }
+}
+
+// 从云端下载数据
+async function downloadFromCloud() {
+    const token = getGitHubToken();
+    if (!token) {
+        showNotification('请先设置GitHub Token');
+        return;
+    }
+    
+    if (!confirm('确定要从云端下载数据吗？这将覆盖当前设备的数据。')) {
+        return;
+    }
+    
+    showNotification('正在从云端下载数据...');
+    
+    const gistData = await loadFromGist();
+    if (gistData) {
+        memories = gistData.memories || [];
+        anniversaries = gistData.anniversaries || [];
+        messages = gistData.messages || [];
+        wishes = gistData.wishes || [];
+        moods = gistData.moods || [];
+        loveStartDate = gistData.loveStartDate || null;
+        
+        // 保存到本地存储
+        saveToLocalStorage(STORAGE_KEYS.MEMORIES, memories);
+        saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, anniversaries);
+        saveToLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+        saveToLocalStorage(STORAGE_KEYS.WISHES, wishes);
+        saveToLocalStorage(STORAGE_KEYS.MOODS, moods);
+        if (loveStartDate) {
+            localStorage.setItem('loveStartDate', loveStartDate);
+        }
+        
+        // 重新渲染所有页面
+        renderMemories();
+        renderAnniversaries();
+        renderCalendar();
+        renderMessages();
+        renderWishes();
+        renderMoods();
+        renderPhotoWall();
+        renderCountdown();
+        
+        showNotification('数据已从云端下载成功！');
+    } else {
+        showNotification('云端暂无数据或下载失败');
+    }
+}
+
 
 
 // 全局变量
@@ -502,6 +582,10 @@ function bindAllEvents() {
         localStorage.removeItem('gistId');
         showNotification('GitHub Token已清除，将使用本地存储');
     });
+    
+    // 云端同步按钮
+    document.getElementById('upload-to-cloud-btn').addEventListener('click', uploadToCloud);
+    document.getElementById('download-from-cloud-btn').addEventListener('click', downloadFromCloud);
     
     // 加载已保存的Token状态
     const savedToken = getGitHubToken();
