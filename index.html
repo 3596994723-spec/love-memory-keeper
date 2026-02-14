@@ -466,6 +466,22 @@
             </div>
             
             <div class="settings-section">
+                <h3>🔑 GitHub Token设置</h3>
+                <p class="settings-hint">设置GitHub Personal Access Token以启用云端同步</p>
+                <div class="form-group">
+                    <input type="password" id="github-token-input" placeholder="输入GitHub Token" style="width: 100%; margin-bottom: 10px;">
+                </div>
+                <button class="btn" id="save-github-token-btn">保存Token</button>
+                <button class="btn" id="clear-github-token-btn" style="margin-left: 10px; background: #e74c3c;">清除Token</button>
+                <p class="settings-hint" style="margin-top: 10px; font-size: 0.5rem;">
+                    如何获取Token：<br>
+                    1. 登录GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)<br>
+                    2. 点击"Generate new token (classic)"<br>
+                    3. 勾选"gist"权限，生成Token并复制
+                </p>
+            </div>
+            
+            <div class="settings-section">
                 <h3>📅 恋爱开始日期</h3>
                 <div class="form-group">
                     <input type="date" id="love-start-date">
@@ -522,6 +538,6 @@
         </div>
     </div>
     
-    <script src="script.js?v=20260214v2"></script>
+    <script src="script.js?v=20260214v3"></script>
 </body>
 </html>

@@ -1,13 +1,34 @@
 // GitHub Gists 配置
 const GIST_ID = 'love-memory-keeper-data';
-const GITHUB_TOKEN = ''; // 用户需要在GitHub生成个人访问令牌
+
+// 获取GitHub Token
+function getGitHubToken() {
+    return localStorage.getItem('githubToken') || '';
+}
+
+// 设置GitHub Token
+function setGitHubToken(token) {
+    localStorage.setItem('githubToken', token);
+}
 
 // GitHub Gists API 函数
 async function saveToGist(data) {
     try {
+        const token = getGitHubToken();
+        if (!token) {
+            console.log('未设置GitHub Token，使用本地存储');
+            saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
+            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
+            saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
+            saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
+            saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
+            showNotification('数据已保存到本地存储（未设置GitHub Token）');
+            return true;
+        }
+        
         const gistData = {
             description: '恋爱记忆记录器数据',
-            public: true, // 设置为公开，可能不需要身份验证
+            public: false,
             files: {
                 'love-memory-data.json': {
                     content: JSON.stringify(data, null, 2)
@@ -15,23 +36,25 @@ async function saveToGist(data) {
             }
         };
         
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${token}`
+        };
+        
         let response;
-        if (localStorage.getItem('gistId')) {
+        const gistId = localStorage.getItem('gistId');
+        if (gistId) {
             // 更新现有Gist
-            response = await fetch(`https://api.github.com/gists/${localStorage.getItem('gistId')}`, {
+            response = await fetch(`https://api.github.com/gists/${gistId}`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify(gistData)
             });
         } else {
             // 创建新Gist
             response = await fetch('https://api.github.com/gists', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify(gistData)
             });
         }
@@ -40,13 +63,34 @@ async function saveToGist(data) {
             const result = await response.json();
             localStorage.setItem('gistId', result.id);
             console.log('数据保存到GitHub Gist成功');
+            // 同时保存到本地存储作为备份
+            saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
+            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
+            saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
+            saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
+            saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
             return true;
         } else {
-            console.error('保存到GitHub Gist失败:', await response.text());
+            const errorText = await response.text();
+            console.error('保存到GitHub Gist失败:', errorText);
+            // 保存到本地存储作为备份
+            saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
+            saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
+            saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
+            saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
+            saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
+            showNotification('GitHub同步失败，数据已保存到本地');
             return false;
         }
     } catch (error) {
         console.error('保存到GitHub Gist失败:', error);
+        // 保存到本地存储作为备份
+        saveToLocalStorage(STORAGE_KEYS.MEMORIES, data.memories);
+        saveToLocalStorage(STORAGE_KEYS.ANNIVERSARIES, data.anniversaries);
+        saveToLocalStorage(STORAGE_KEYS.MESSAGES, data.messages);
+        saveToLocalStorage(STORAGE_KEYS.WISHES, data.wishes);
+        saveToLocalStorage(STORAGE_KEYS.MOODS, data.moods);
+        showNotification('网络错误，数据已保存到本地');
         return false;
     }
 }
@@ -56,11 +100,13 @@ async function loadFromGist() {
         const gistId = localStorage.getItem('gistId');
         if (!gistId) return null;
         
-        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-            headers: {
-                ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
-            }
-        });
+        const token = getGitHubToken();
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `token ${token}`;
+        }
+        
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
         
         if (response.ok) {
             const result = await response.json();
@@ -417,6 +463,31 @@ function bindAllEvents() {
             showNotification('日期保存成功！');
         }
     });
+    
+    // GitHub Token设置
+    document.getElementById('save-github-token-btn').addEventListener('click', function() {
+        const token = document.getElementById('github-token-input').value.trim();
+        if (token) {
+            setGitHubToken(token);
+            showNotification('GitHub Token保存成功！云端同步已启用');
+            document.getElementById('github-token-input').value = '';
+        } else {
+            showNotification('请输入有效的GitHub Token');
+        }
+    });
+    
+    document.getElementById('clear-github-token-btn').addEventListener('click', function() {
+        localStorage.removeItem('githubToken');
+        localStorage.removeItem('gistId');
+        showNotification('GitHub Token已清除，将使用本地存储');
+    });
+    
+    // 加载已保存的Token状态
+    const savedToken = getGitHubToken();
+    if (savedToken) {
+        document.getElementById('github-token-input').placeholder = '已设置Token（输入新Token可更新）';
+    }
+    
     document.getElementById('export-data-btn').addEventListener('click', exportData);
     document.getElementById('import-data-input').addEventListener('change', importData);
     document.getElementById('clear-data-btn').addEventListener('click', clearAllData);
