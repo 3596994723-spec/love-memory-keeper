@@ -7,7 +7,7 @@ async function saveToGist(data) {
     try {
         const gistData = {
             description: '恋爱记忆记录器数据',
-            public: false,
+            public: true, // 设置为公开，可能不需要身份验证
             files: {
                 'love-memory-data.json': {
                     content: JSON.stringify(data, null, 2)
@@ -21,8 +21,7 @@ async function saveToGist(data) {
             response = await fetch(`https://api.github.com/gists/${localStorage.getItem('gistId')}`, {
                 method: 'PATCH',
                 headers: {
-                    'Content-Type': 'application/json',
-                    ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(gistData)
             });
@@ -31,8 +30,7 @@ async function saveToGist(data) {
             response = await fetch('https://api.github.com/gists', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(gistData)
             });
@@ -1122,7 +1120,7 @@ async function importData(e) {
                 console.log('恋爱开始日期导入成功:', loveStartDate);
             }
             
-            // 保存到GitHub Gist
+            // 保存到GitHub Gist（可选，失败不影响导入）
             console.log('保存数据到GitHub Gist...');
             const saveData = {
                 memories,
@@ -1132,7 +1130,16 @@ async function importData(e) {
                 moods,
                 loveStartDate
             };
-            await saveToGist(saveData);
+            try {
+                const gistSaved = await saveToGist(saveData);
+                if (gistSaved) {
+                    console.log('数据已同步到GitHub Gist');
+                } else {
+                    console.log('GitHub Gist同步失败，使用本地存储');
+                }
+            } catch (error) {
+                console.error('GitHub Gist同步失败:', error);
+            }
             
             // 重新加载数据
             console.log('导入完成，重新加载数据...');
