@@ -83,9 +83,8 @@ async function saveToGist(data) {
         // 压缩照片
         const compressedData = {
             ...cleanData,
-            memories: await Promise.all(cleanData.memories.map(async (m) => ({
-                ...m,
-                photos: await Promise.all(m.photos.map(async (p) => {
+            memories: await Promise.all(cleanData.memories.map(async (m) => {
+                const compressedPhotos = await Promise.all(m.photos.map(async (p) => {
                     if (p.startsWith('data:image') && p.length > 50000) {
                         try {
                             return await compressImage(p, 600, 0.6);
@@ -95,8 +94,12 @@ async function saveToGist(data) {
                         }
                     }
                     return p;
-                })).filter(p => p && p.length > 0)
-            })))
+                }));
+                return {
+                    ...m,
+                    photos: compressedPhotos.filter(p => p && p.length > 0)
+                };
+            }))
         };
         
         // 序列化数据，确保没有无效字符
