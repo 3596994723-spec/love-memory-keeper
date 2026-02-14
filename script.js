@@ -55,26 +55,65 @@ async function saveToGist(data) {
             return true;
         }
         
-        // 压缩照片数据
-        const compressedData = {
-            ...data,
-            memories: await Promise.all(data.memories.map(async (m) => ({
+        // 压缩照片数据并清理无效数据
+        const cleanData = {
+            memories: data.memories.map(m => ({
                 ...m,
-                photos: m.photos ? await Promise.all(m.photos.map(async (p) => {
-                    if (typeof p === 'string' && p.startsWith('data:image') && p.length > 100000) {
-                        return await compressImage(p);
+                photos: (m.photos || []).filter(p => p && typeof p === 'string' && p.length > 0)
+            })),
+            anniversaries: data.anniversaries || [],
+            messages: data.messages || [],
+            wishes: data.wishes || [],
+            moods: data.moods || [],
+            loveStartDate: data.loveStartDate || null
+        };
+        
+        // 压缩照片
+        const compressedData = {
+            ...cleanData,
+            memories: await Promise.all(cleanData.memories.map(async (m) => ({
+                ...m,
+                photos: await Promise.all(m.photos.map(async (p) => {
+                    if (p.startsWith('data:image') && p.length > 50000) {
+                        try {
+                            return await compressImage(p, 600, 0.6);
+                        } catch (e) {
+                            console.error('图片压缩失败:', e);
+                            return '';
+                        }
                     }
                     return p;
-                })) : []
+                })).filter(p => p && p.length > 0)
             })))
         };
+        
+        // 序列化数据，确保没有无效字符
+        let jsonContent;
+        try {
+            jsonContent = JSON.stringify(compressedData);
+            // 验证JSON是否有效
+            JSON.parse(jsonContent);
+        } catch (e) {
+            console.error('JSON序列化失败:', e);
+            showNotification('数据序列化失败，请减少照片数量');
+            return false;
+        }
+        
+        // 检查数据大小（GitHub限制约1MB）
+        const dataSize = new Blob([jsonContent]).size;
+        console.log(`数据大小: ${(dataSize / 1024 / 1024).toFixed(2)} MB`);
+        
+        if (dataSize > 9 * 1024 * 1024) { // 9MB限制
+            showNotification('数据太大，请减少照片数量或压缩照片');
+            return false;
+        }
         
         const gistData = {
             description: '恋爱记忆记录器数据',
             public: false,
             files: {
                 'love-memory-data.json': {
-                    content: JSON.stringify(compressedData)
+                    content: jsonContent
                 }
             }
         };
@@ -153,9 +192,34 @@ async function loadFromGist() {
         if (response.ok) {
             const result = await response.json();
             const content = result.files['love-memory-data.json'].content;
-            const data = JSON.parse(content);
-            console.log('从GitHub Gist加载数据成功');
-            return data;
+            
+            // 尝试解析JSON，处理可能的错误
+            try {
+                const data = JSON.parse(content);
+                console.log('从GitHub Gist加载数据成功');
+                return data;
+            } catch (parseError) {
+                console.error('JSON解析错误，尝试修复...', parseError);
+                
+                // 尝试修复常见的JSON错误
+                let fixedContent = content;
+                
+                // 移除可能的控制字符
+                fixedContent = fixedContent.replace(/[\x00-\x1F\x7F]/g, (char) => {
+                    if (char === '\n' || char === '\r' || char === '\t') return char;
+                    return '';
+                });
+                
+                try {
+                    const data = JSON.parse(fixedContent);
+                    console.log('JSON修复成功');
+                    return data;
+                } catch (e) {
+                    console.error('JSON修复失败，数据可能已损坏');
+                    showNotification('云端数据损坏，请重新上传');
+                    return null;
+                }
+            }
         } else {
             console.error('从GitHub Gist加载数据失败:', await response.text());
             return null;
