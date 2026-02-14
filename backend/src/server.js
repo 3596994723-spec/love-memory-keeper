@@ -14,9 +14,6 @@ const moodRoutes = require('./routes/moods');
 // 初始化应用
 const app = express();
 
-// 连接数据库
-connectDB();
-
 // 中间件
 app.use(cors({
   origin: 'https://3596994723-spec.github.io'
@@ -46,4 +43,6 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`服务器运行在端口 ${PORT}`);
+  // 启动后再连接数据库，避免阻塞服务器启动
+  connectDB();
 });
