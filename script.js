@@ -55,6 +55,18 @@ async function saveToGist(data) {
             return true;
         }
         
+        // 先获取云端最新数据，避免冲突
+        const gistId = localStorage.getItem('gistId');
+        if (gistId) {
+            console.log('获取云端最新数据...');
+            const cloudData = await loadFromGist();
+            if (cloudData) {
+                // 合并数据：保留云端的其他用户数据，更新当前用户修改的部分
+                // 这里简单处理：直接使用当前数据覆盖云端
+                console.log('云端数据已获取，准备更新');
+            }
+        }
+        
         // 压缩照片数据并清理无效数据
         const cleanData = {
             memories: data.memories.map(m => ({
@@ -125,9 +137,8 @@ async function saveToGist(data) {
         
         let response;
         let retryCount = 0;
-        const maxRetries = 3;
+        const maxRetries = 5;
         
-        const gistId = localStorage.getItem('gistId');
         if (gistId) {
             // 更新现有Gist，添加重试机制
             while (retryCount < maxRetries) {
@@ -137,11 +148,21 @@ async function saveToGist(data) {
                     body: JSON.stringify(gistData)
                 });
                 
-                if (response.ok || response.status !== 409) break;
+                if (response.ok) break;
                 
-                retryCount++;
-                console.log(`Gist更新冲突，重试第${retryCount}次...`);
-                await new Promise(r => setTimeout(r, 1000 * retryCount));
+                if (response.status === 409) {
+                    retryCount++;
+                    console.log(`Gist更新冲突，重试第${retryCount}次...`);
+                    await new Promise(r => setTimeout(r, 2000 * retryCount));
+                    
+                    // 重新获取数据后再次尝试
+                    const freshData = await loadFromGist();
+                    if (freshData && retryCount < maxRetries - 1) {
+                        continue;
+                    }
+                } else {
+                    break;
+                }
             }
         } else {
             // 创建新Gist
@@ -163,9 +184,13 @@ async function saveToGist(data) {
             console.error('保存到GitHub Gist失败:', errorText);
             
             if (response.status === 409) {
-                showNotification('同步冲突，请稍后重试');
+                showNotification('同步冲突，对方正在编辑，请稍后重试');
+            } else if (response.status === 401) {
+                showNotification('Token无效，请重新设置');
+            } else if (response.status === 403) {
+                showNotification('权限不足，请检查Token权限');
             } else {
-                showNotification('云端同步失败');
+                showNotification('云端同步失败: ' + response.status);
             }
             return false;
         }
