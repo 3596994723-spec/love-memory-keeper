@@ -697,24 +697,25 @@ function startLoveTimer() {
     if (!loveStartDate) return;
     
     const startDate = new Date(loveStartDate);
+    startDate.setHours(0, 0, 0, 0);
     
     function updateTimer() {
-        // 获取当前时间并转换为北京时间（UTC+8）
         const now = new Date();
-        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-        const beijingTime = new Date(utc + 8 * 60 * 60 * 1000);
         
-        const diff = beijingTime - startDate;
-        
+        // 计算天数（从设置日期的零点开始计算）
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const diff = todayStart - startDate;
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        // 显示当前时间（24小时制）
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
         
         document.getElementById('timer-days').textContent = days;
-        document.getElementById('timer-hours').textContent = hours;
-        document.getElementById('timer-minutes').textContent = minutes;
-        document.getElementById('timer-seconds').textContent = seconds;
+        document.getElementById('timer-hours').textContent = String(hours).padStart(2, '0');
+        document.getElementById('timer-minutes').textContent = String(minutes).padStart(2, '0');
+        document.getElementById('timer-seconds').textContent = String(seconds).padStart(2, '0');
     }
     
     updateTimer();
@@ -2219,6 +2220,7 @@ function resetAnniversaryForm() {
     document.getElementById('anniversary-form').reset();
     document.getElementById('anniversary-form-title').textContent = '纪念日管理';
     document.getElementById('anniversary-submit-btn').textContent = '添加纪念日';
+    editingAnniversaryId = null;
 }
 
 function editAnniversary(id) {
@@ -2508,19 +2510,38 @@ function renderStats() {
     if (memories.length === 0) {
         timeDistribution.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.6rem;">还没有记忆数据</p>';
     } else {
-        // 按月份统计
+        // 获取所有年份
+        const years = [...new Set(memories.map(m => new Date(m.date).getFullYear()))].sort((a, b) => b - a);
+        const currentYear = window.statsYear || years[0] || new Date().getFullYear();
+        window.statsYear = currentYear;
+        
+        // 按月份统计当前年份
         const monthlyStats = Array(12).fill(0);
         const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
         
         memories.forEach(m => {
             const date = new Date(m.date);
-            const month = date.getMonth();
-            monthlyStats[month]++;
+            if (date.getFullYear() === currentYear) {
+                const month = date.getMonth();
+                monthlyStats[month]++;
+            }
         });
         
-        const maxCount = Math.max(...monthlyStats);
+        const maxCount = Math.max(...monthlyStats, 1);
+        
+        // 年份切换按钮
+        const yearButtons = years.map(y => `
+            <button class="btn ${y === currentYear ? 'btn-primary' : ''}" 
+                    onclick="changeStatsYear(${y})" 
+                    style="font-size: 0.5rem; padding: 5px 10px; margin: 2px;">
+                ${y}年
+            </button>
+        `).join('');
         
         timeDistribution.innerHTML = `
+            <div style="margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center;">
+                ${yearButtons}
+            </div>
             <div style="width: 100%; height: 200px; display: flex; align-items: flex-end; justify-content: space-around; padding: 20px 0;">
                 ${monthlyStats.map((count, index) => {
                     const height = count > 0 ? (count / maxCount) * 150 : 10;
@@ -2535,6 +2556,12 @@ function renderStats() {
             </div>
         `;
     }
+}
+
+// 切换统计年份
+function changeStatsYear(year) {
+    window.statsYear = year;
+    renderStats();
 }
 
 // AI助手

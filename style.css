@@ -900,6 +900,21 @@ section.page h2 {
     color: #fff;
 }
 
+.calendar-day.other-month {
+    color: #ccc;
+    background: #f9f9f9;
+}
+
+.calendar-day.other-month.has-memory {
+    background: linear-gradient(180deg, #f5d89a 0%, #e5c88a 100%);
+    color: #fff;
+}
+
+.calendar-day.other-month.has-anniversary {
+    background: linear-gradient(180deg, #c9a0dc 0%, #b890cc 100%);
+    color: #fff;
+}
+
 /* 地图样式 */
 .memory-map {
     height: 400px;
