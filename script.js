@@ -185,21 +185,28 @@ async function saveToGist(data) {
         } else {
             const errorText = await response.text();
             console.error('保存到GitHub Gist失败:', errorText);
+            console.error('响应状态:', response.status);
+            console.error('Token长度:', token ? token.length : 0);
+            console.error('Gist ID:', gistId);
             
             if (response.status === 409) {
                 showNotification('同步冲突，对方正在编辑，请稍后重试');
             } else if (response.status === 401) {
-                showNotification('Token无效，请重新设置');
+                showNotification('Token无效或已过期，请重新生成');
             } else if (response.status === 403) {
-                showNotification('权限不足，请检查Token权限');
+                showNotification('权限不足，Token需要gist权限');
+            } else if (response.status === 404) {
+                showNotification('Gist不存在，请检查Gist ID');
+            } else if (response.status === 422) {
+                showNotification('数据格式错误，请检查数据');
             } else {
-                showNotification('云端同步失败: ' + response.status);
+                showNotification('云端同步失败: ' + response.status + ' - ' + errorText.substring(0, 100));
             }
             return false;
         }
     } catch (error) {
         console.error('保存到GitHub Gist失败:', error);
-        showNotification('网络错误，请检查网络连接');
+        showNotification('网络错误: ' + error.message);
         return false;
     }
 }
