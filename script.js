@@ -557,6 +557,9 @@ function bindAllEvents() {
         
         // 处理返回按钮点击
         if (e.target.closest('.back-btn')) {
+            // 重置所有编辑状态
+            resetMemoryForm();
+            resetAnniversaryForm();
             showPage('home');
         }
     });
