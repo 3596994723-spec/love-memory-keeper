@@ -1928,3 +1928,452 @@ footer {
         font-size: 0.4rem;
     }
 }
+
+/* 记忆时间轴样式 */
+.timeline-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--card-bg);
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+}
+
+.timeline-filter-btn {
+    font-family: 'Press Start 2P', cursive;
+    padding: 8px 15px;
+    border: 2px solid var(--border-color);
+    background: #fff;
+    color: var(--text-color);
+    font-size: 0.5rem;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.2s;
+}
+
+.timeline-filter-btn:hover,
+.timeline-filter-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--secondary-color);
+}
+
+.timeline-container {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--primary-color), var(--secondary-color));
+    border-radius: 2px;
+}
+
+.timeline-item {
+    position: relative;
+    width: 45%;
+    padding: 20px;
+    background: var(--card-bg);
+    border: 4px solid var(--border-color);
+    border-radius: 15px;
+    margin-bottom: 30px;
+    box-shadow: 4px 4px 0 var(--primary-color);
+}
+
+.timeline-item:nth-child(odd) {
+    margin-left: 5%;
+}
+
+.timeline-item:nth-child(even) {
+    margin-left: 50%;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    width: 20px;
+    height: 20px;
+    background: var(--secondary-color);
+    border: 4px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px var(--primary-color);
+}
+
+.timeline-item:nth-child(odd)::before {
+    right: -32px;
+}
+
+.timeline-item:nth-child(even)::before {
+    left: -32px;
+}
+
+.timeline-date {
+    font-size: 0.55rem;
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.timeline-type {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--accent-color);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 0.45rem;
+    margin-bottom: 10px;
+}
+
+.timeline-content {
+    font-size: 0.6rem;
+    color: var(--text-color);
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.timeline-photos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.timeline-photos img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.timeline-photos img:hover {
+    transform: scale(1.1);
+}
+
+.timeline-location {
+    font-size: 0.5rem;
+    color: #666;
+    margin-top: 8px;
+}
+
+.timeline-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.timeline-tag {
+    background: var(--primary-color);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.4rem;
+}
+
+@media (max-width: 768px) {
+    .timeline-container::before {
+        left: 20px;
+    }
+    
+    .timeline-item {
+        width: calc(100% - 50px);
+        margin-left: 50px !important;
+    }
+    
+    .timeline-item::before {
+        left: -32px !important;
+        right: auto !important;
+    }
+}
+
+/* 年度报告样式 */
+.report-year-selector {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 15px;
+    background: var(--card-bg);
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+    flex-wrap: wrap;
+}
+
+.report-year-selector label {
+    font-size: 0.6rem;
+    color: var(--secondary-color);
+}
+
+.report-year-selector select {
+    font-family: 'Press Start 2P', cursive;
+    padding: 10px 15px;
+    border: 3px solid var(--border-color);
+    background: #fff;
+    font-size: 0.6rem;
+    border-radius: 5px;
+}
+
+.annual-report-content {
+    background: var(--card-bg);
+    border: 4px solid var(--border-color);
+    border-radius: 15px;
+    padding: 25px;
+    min-height: 300px;
+}
+
+.report-header {
+    text-align: center;
+    padding: 30px 0;
+    border-bottom: 4px dashed var(--border-color);
+    margin-bottom: 25px;
+}
+
+.report-header h3 {
+    font-size: 1.2rem;
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+}
+
+.report-header .report-subtitle {
+    font-size: 0.7rem;
+    color: #666;
+}
+
+.report-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #fff;
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+}
+
+[data-theme="dark"] .report-section {
+    background: #1a1a2e;
+}
+
+.report-section h4 {
+    font-size: 0.75rem;
+    color: var(--secondary-color);
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.report-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 15px;
+}
+
+.report-stat {
+    text-align: center;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+}
+
+.report-stat-number {
+    font-size: 1.5rem;
+    color: var(--secondary-color);
+    font-weight: bold;
+}
+
+.report-stat-label {
+    font-size: 0.5rem;
+    color: #666;
+    margin-top: 5px;
+}
+
+.report-highlight {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-radius: 10px;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.report-highlight-icon {
+    font-size: 2rem;
+}
+
+.report-highlight-text {
+    font-size: 0.6rem;
+    line-height: 1.5;
+}
+
+.report-chart {
+    height: 150px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+}
+
+.report-chart-bar {
+    width: 30px;
+    background: linear-gradient(180deg, var(--primary-color), var(--secondary-color));
+    border-radius: 4px 4px 0 0;
+    position: relative;
+}
+
+.report-chart-bar::after {
+    content: attr(data-month);
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.4rem;
+    color: #666;
+}
+
+.report-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* 照片墙工具栏 */
+.photo-wall-toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--card-bg);
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+}
+
+/* 照片编辑器样式 */
+.photo-editor-content {
+    max-width: 600px;
+    width: 95%;
+}
+
+.photo-editor-preview {
+    width: 100%;
+    max-height: 300px;
+    overflow: hidden;
+    border: 4px solid var(--border-color);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f5f5f5;
+}
+
+.photo-editor-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+}
+
+.photo-editor-tools {
+    margin-bottom: 20px;
+}
+
+.editor-tool-group {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.editor-tool-group label {
+    display: block;
+    font-size: 0.55rem;
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+}
+
+.editor-tool-group input[type="range"] {
+    width: 100%;
+    height: 8px;
+    -webkit-appearance: none;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 4px;
+    outline: none;
+}
+
+.editor-tool-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border: 3px solid var(--secondary-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.filter-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-btn {
+    font-family: 'Press Start 2P', cursive;
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    background: #fff;
+    color: var(--text-color);
+    font-size: 0.45rem;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover,
+.filter-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--secondary-color);
+}
+
+.photo-editor-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* 照片滤镜预览效果 */
+.filter-grayscale {
+    filter: grayscale(100%);
+}
+
+.filter-sepia {
+    filter: sepia(80%);
+}
+
+.filter-warm {
+    filter: sepia(30%) saturate(140%);
+}
+
+.filter-cool {
+    filter: hue-rotate(180deg) saturate(80%);
+}
+
+.filter-vintage {
+    filter: sepia(40%) contrast(90%) brightness(90%);
+}

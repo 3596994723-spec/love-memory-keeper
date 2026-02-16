@@ -800,6 +800,10 @@ function bindAllEvents() {
     
     // 地图状态检查
     document.getElementById('check-map-btn').addEventListener('click', checkMapStatus);
+    
+    // 初始化新功能
+    initTimelineFilters();
+    initPhotoEditor();
 }
 
 // 显示页面
@@ -971,6 +975,7 @@ function renderPhotoWall() {
 }
 
 function showPhoto(src) {
+    currentEditingPhoto = src;
     document.getElementById('photo-modal-img').src = src;
     document.getElementById('photo-modal').style.display = 'flex';
 }
@@ -3004,3 +3009,541 @@ function showNotification(msg) {
     document.body.appendChild(n);
     setTimeout(() => n.remove(), 3000);
 }
+
+// ==================== 记忆时间轴功能 ====================
+let currentTimelineFilter = 'all';
+
+function renderTimeline() {
+    const container = document.getElementById('timeline-container');
+    if (!container) return;
+    
+    let filteredMemories = [...memories];
+    if (currentTimelineFilter !== 'all') {
+        filteredMemories = memories.filter(m => m.type === currentTimelineFilter);
+    }
+    
+    if (filteredMemories.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:#666;font-size:0.6rem;padding:40px;">还没有记忆记录</p>';
+        return;
+    }
+    
+    const sorted = filteredMemories.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const typeNames = { date: '约会', milestone: '里程碑', story: '故事', travel: '旅行' };
+    const typeColors = { date: '#ff6b9d', milestone: '#9b59b6', story: '#3498db', travel: '#27ae60' };
+    
+    container.innerHTML = sorted.map(m => {
+        const dateDisplay = m.dateRange 
+            ? `${formatDate(m.dateRange.start)} - ${formatDate(m.dateRange.end)}`
+            : formatDate(m.date);
+        
+        let locationDisplay = '';
+        if (m.locations && m.locations.length > 0) {
+            locationDisplay = `<div class="timeline-location">📍 ${m.locations.map(l => l.name.split(',')[0]).join('、')}</div>`;
+        } else if (m.location) {
+            locationDisplay = `<div class="timeline-location">📍 ${m.location.name.split(',')[0]}</div>`;
+        }
+        
+        let tagsDisplay = '';
+        if (m.tags && m.tags.length > 0) {
+            tagsDisplay = `<div class="timeline-tags">${m.tags.map(tag => `<span class="timeline-tag">${tag}</span>`).join('')}</div>`;
+        }
+        
+        let photosDisplay = '';
+        if (m.photos && m.photos.length > 0) {
+            photosDisplay = `<div class="timeline-photos">${m.photos.slice(0, 4).map(p => {
+                if (p.startsWith('data:video/')) {
+                    return `<video src="${p}" style="width:60px;height:60px;object-fit:cover;border:2px solid var(--border-color);border-radius:5px;" controls></video>`;
+                }
+                return `<img src="${p}" alt="照片" onclick="showPhoto('${p}')">`;
+            }).join('')}</div>`;
+        }
+        
+        return `
+            <div class="timeline-item">
+                <div class="timeline-date">${dateDisplay}</div>
+                <span class="timeline-type" style="background:${typeColors[m.type]}">${typeNames[m.type]}</span>
+                <div class="timeline-content">${m.content}</div>
+                ${locationDisplay}
+                ${tagsDisplay}
+                ${photosDisplay}
+            </div>
+        `;
+    }).join('');
+}
+
+function initTimelineFilters() {
+    const filterBtns = document.querySelectorAll('.timeline-filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentTimelineFilter = this.getAttribute('data-filter');
+            renderTimeline();
+        });
+    });
+}
+
+// ==================== 年度报告功能 ====================
+function initAnnualReport() {
+    const yearSelect = document.getElementById('report-year-select');
+    if (!yearSelect) return;
+    
+    const currentYear = new Date().getFullYear();
+    const years = new Set(memories.map(m => new Date(m.date).getFullYear()));
+    years.add(currentYear);
+    
+    const sortedYears = [...years].sort((a, b) => b - a);
+    yearSelect.innerHTML = sortedYears.map(y => `<option value="${y}">${y}年</option>`).join('');
+    
+    document.getElementById('generate-report-btn').addEventListener('click', generateAnnualReport);
+    document.getElementById('export-report-image').addEventListener('click', exportReportAsImage);
+    document.getElementById('share-report').addEventListener('click', shareReport);
+}
+
+function generateAnnualReport() {
+    const year = parseInt(document.getElementById('report-year-select').value);
+    const content = document.getElementById('annual-report-content');
+    const actions = document.getElementById('report-actions');
+    
+    const yearMemories = memories.filter(m => new Date(m.date).getFullYear() === year);
+    const yearAnniversaries = anniversaries.filter(a => new Date(a.date).getFullYear() === year);
+    const yearMoods = moods.filter(m => new Date(m.date).getFullYear() === year);
+    const yearMessages = messages.filter(m => new Date(m.createdAt).getFullYear() === year);
+    
+    const totalPhotos = yearMemories.reduce((sum, m) => sum + (m.photos ? m.photos.length : 0), 0);
+    
+    const typeStats = yearMemories.reduce((acc, m) => {
+        acc[m.type] = (acc[m.type] || 0) + 1;
+        return acc;
+    }, {});
+    const typeNames = { date: '约会', milestone: '里程碑', story: '故事', travel: '旅行' };
+    
+    const allLocations = [];
+    yearMemories.forEach(m => {
+        const locs = m.locations || (m.location ? [m.location] : []);
+        locs.forEach(l => allLocations.push(l.name.split(',')[0]));
+    });
+    const uniqueLocations = [...new Set(allLocations)];
+    
+    const monthlyStats = Array(12).fill(0);
+    yearMemories.forEach(m => {
+        const month = new Date(m.date).getMonth();
+        monthlyStats[month]++;
+    });
+    const maxMonthly = Math.max(...monthlyStats, 1);
+    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    
+    let highlights = [];
+    if (yearMemories.length > 0) {
+        const longestContent = yearMemories.reduce((a, b) => (a.content.length > b.content.length ? a : b));
+        highlights.push({
+            icon: '📝',
+            text: `最详细的记忆：${longestContent.content.substring(0, 30)}...`
+        });
+    }
+    if (uniqueLocations.length > 0) {
+        highlights.push({
+            icon: '🗺️',
+            text: `探索了 ${uniqueLocations.length} 个不同的地方`
+        });
+    }
+    if (totalPhotos > 0) {
+        highlights.push({
+            icon: '📸',
+            text: `记录了 ${totalPhotos} 张珍贵照片`
+        });
+    }
+    
+    content.innerHTML = `
+        <div class="report-header">
+            <h3>💕 ${year}年度恋爱报告 💕</h3>
+            <p class="report-subtitle">属于我们的美好回忆</p>
+        </div>
+        
+        <div class="report-section">
+            <h4>📊 年度数据总览</h4>
+            <div class="report-stats-grid">
+                <div class="report-stat">
+                    <div class="report-stat-number">${yearMemories.length}</div>
+                    <div class="report-stat-label">记忆总数</div>
+                </div>
+                <div class="report-stat">
+                    <div class="report-stat-number">${totalPhotos}</div>
+                    <div class="report-stat-label">照片数量</div>
+                </div>
+                <div class="report-stat">
+                    <div class="report-stat-number">${uniqueLocations.length}</div>
+                    <div class="report-stat-label">去过的地方</div>
+                </div>
+                <div class="report-stat">
+                    <div class="report-stat-number">${yearMoods.length}</div>
+                    <div class="report-stat-label">心情记录</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-section">
+            <h4>🏆 年度亮点</h4>
+            ${highlights.map(h => `
+                <div class="report-highlight">
+                    <span class="report-highlight-icon">${h.icon}</span>
+                    <span class="report-highlight-text">${h.text}</span>
+                </div>
+            `).join('')}
+        </div>
+        
+        <div class="report-section">
+            <h4>📈 月度记忆分布</h4>
+            <div class="report-chart">
+                ${monthlyStats.map((count, i) => {
+                    const height = (count / maxMonthly) * 120;
+                    return `<div class="report-chart-bar" style="height:${Math.max(height, 5)}px" data-month="${monthNames[i]}" title="${count}条记忆"></div>`;
+                }).join('')}
+            </div>
+        </div>
+        
+        <div class="report-section">
+            <h4>🎯 记忆类型分布</h4>
+            <div class="report-stats-grid">
+                ${Object.entries(typeStats).map(([type, count]) => `
+                    <div class="report-stat">
+                        <div class="report-stat-number">${count}</div>
+                        <div class="report-stat-label">${typeNames[type]}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <div class="report-section">
+            <h4>🗺️ 足迹地图</h4>
+            <p style="font-size:0.6rem;color:var(--text-color);line-height:1.8;">
+                ${uniqueLocations.length > 0 ? uniqueLocations.slice(0, 10).join('、') : '暂无地点记录'}
+            </p>
+        </div>
+    `;
+    
+    actions.style.display = 'flex';
+    showNotification('年度报告生成成功！');
+}
+
+function exportReportAsImage() {
+    showNotification('正在生成图片，请稍候...');
+    
+    const content = document.getElementById('annual-report-content');
+    
+    if (typeof html2canvas !== 'undefined') {
+        html2canvas(content).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `恋爱年度报告-${new Date().getFullYear()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            showNotification('图片已保存！');
+        }).catch(err => {
+            console.error('导出图片失败:', err);
+            showNotification('导出图片失败，请使用截图工具');
+        });
+    } else {
+        const script = document.createElement('script');
+        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+        script.onload = function() {
+            html2canvas(content).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `恋爱年度报告-${new Date().getFullYear()}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showNotification('图片已保存！');
+            });
+        };
+        document.head.appendChild(script);
+    }
+}
+
+function shareReport() {
+    const year = document.getElementById('report-year-select').value;
+    const yearMemories = memories.filter(m => new Date(m.date).getFullYear() === parseInt(year));
+    const totalPhotos = yearMemories.reduce((sum, m) => sum + (m.photos ? m.photos.length : 0), 0);
+    
+    const shareText = `💕 ${year}年度恋爱报告 💕\n\n` +
+        `📝 记忆总数：${yearMemories.length}条\n` +
+        `📸 照片数量：${totalPhotos}张\n` +
+        `🎉 感谢这一年有你的陪伴！\n\n` +
+        `#恋爱记忆记录器 #年度报告`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: `${year}年度恋爱报告`,
+            text: shareText
+        }).catch(err => console.log('分享取消'));
+    } else {
+        navigator.clipboard.writeText(shareText).then(() => {
+            showNotification('报告内容已复制到剪贴板！');
+        }).catch(() => {
+            showNotification('分享功能暂不可用');
+        });
+    }
+}
+
+// ==================== 照片编辑器功能 ====================
+let currentEditingPhoto = null;
+let editorSettings = {
+    filter: 'none',
+    brightness: 100,
+    contrast: 100,
+    saturate: 100,
+    blur: 0
+};
+
+function initPhotoEditor() {
+    const modal = document.getElementById('photo-editor-modal');
+    const closeBtn = document.getElementById('close-photo-editor');
+    const previewImg = document.getElementById('editor-preview-img');
+    
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        resetEditorSettings();
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+            resetEditorSettings();
+        }
+    });
+    
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            editorSettings.filter = this.getAttribute('data-filter');
+            applyEditorFilters();
+        });
+    });
+    
+    document.getElementById('brightness-slider').addEventListener('input', function() {
+        editorSettings.brightness = this.value;
+        document.getElementById('brightness-value').textContent = this.value;
+        applyEditorFilters();
+    });
+    
+    document.getElementById('contrast-slider').addEventListener('input', function() {
+        editorSettings.contrast = this.value;
+        document.getElementById('contrast-value').textContent = this.value;
+        applyEditorFilters();
+    });
+    
+    document.getElementById('saturate-slider').addEventListener('input', function() {
+        editorSettings.saturate = this.value;
+        document.getElementById('saturate-value').textContent = this.value;
+        applyEditorFilters();
+    });
+    
+    document.getElementById('blur-slider').addEventListener('input', function() {
+        editorSettings.blur = this.value;
+        document.getElementById('blur-value').textContent = this.value;
+        applyEditorFilters();
+    });
+    
+    document.getElementById('reset-editor-btn').addEventListener('click', resetEditorSettings);
+    document.getElementById('apply-editor-btn').addEventListener('click', applyEditorToPhoto);
+    document.getElementById('save-edited-photo-btn').addEventListener('click', saveEditedPhoto);
+    
+    document.getElementById('photo-filter-btn').addEventListener('click', () => {
+        if (currentEditingPhoto) {
+            document.getElementById('photo-editor-modal').style.display = 'flex';
+        } else {
+            showNotification('请先点击一张照片进行编辑');
+        }
+    });
+    
+    document.getElementById('photo-edit-btn').addEventListener('click', () => {
+        if (currentEditingPhoto) {
+            document.getElementById('photo-editor-modal').style.display = 'flex';
+        } else {
+            showNotification('请先点击一张照片进行编辑');
+        }
+    });
+    
+    const editCurrentPhotoBtn = document.getElementById('edit-current-photo');
+    if (editCurrentPhotoBtn) {
+        editCurrentPhotoBtn.addEventListener('click', () => {
+            if (currentEditingPhoto) {
+                document.getElementById('photo-modal').style.display = 'none';
+                openPhotoEditor(currentEditingPhoto);
+            }
+        });
+    }
+}
+
+function openPhotoEditor(photoSrc) {
+    currentEditingPhoto = photoSrc;
+    const previewImg = document.getElementById('editor-preview-img');
+    previewImg.src = photoSrc;
+    resetEditorSettings();
+    document.getElementById('photo-editor-modal').style.display = 'flex';
+}
+
+function applyEditorFilters() {
+    const previewImg = document.getElementById('editor-preview-img');
+    let filterString = '';
+    
+    switch(editorSettings.filter) {
+        case 'grayscale':
+            filterString = 'grayscale(100%) ';
+            break;
+        case 'sepia':
+            filterString = 'sepia(80%) ';
+            break;
+        case 'warm':
+            filterString = 'sepia(30%) saturate(140%) ';
+            break;
+        case 'cool':
+            filterString = 'hue-rotate(180deg) saturate(80%) ';
+            break;
+        case 'vintage':
+            filterString = 'sepia(40%) contrast(90%) brightness(90%) ';
+            break;
+        default:
+            filterString = '';
+    }
+    
+    filterString += `brightness(${editorSettings.brightness}%) `;
+    filterString += `contrast(${editorSettings.contrast}%) `;
+    filterString += `saturate(${editorSettings.saturate}%) `;
+    filterString += `blur(${editorSettings.blur}px)`;
+    
+    previewImg.style.filter = filterString;
+}
+
+function resetEditorSettings() {
+    editorSettings = {
+        filter: 'none',
+        brightness: 100,
+        contrast: 100,
+        saturate: 100,
+        blur: 0
+    };
+    
+    document.getElementById('brightness-slider').value = 100;
+    document.getElementById('contrast-slider').value = 100;
+    document.getElementById('saturate-slider').value = 100;
+    document.getElementById('blur-slider').value = 0;
+    
+    document.getElementById('brightness-value').textContent = '100';
+    document.getElementById('contrast-value').textContent = '100';
+    document.getElementById('saturate-value').textContent = '100';
+    document.getElementById('blur-value').textContent = '0';
+    
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-filter') === 'none') {
+            btn.classList.add('active');
+        }
+    });
+    
+    const previewImg = document.getElementById('editor-preview-img');
+    if (previewImg) {
+        previewImg.style.filter = 'none';
+    }
+}
+
+function applyEditorToPhoto() {
+    if (!currentEditingPhoto) return;
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        ctx.filter = document.getElementById('editor-preview-img').style.filter;
+        ctx.drawImage(img, 0, 0);
+        
+        const editedPhoto = canvas.toDataURL('image/jpeg', 0.9);
+        
+        document.getElementById('photo-modal-img').src = editedPhoto;
+        showNotification('效果已应用！');
+    };
+    
+    img.src = currentEditingPhoto;
+}
+
+function saveEditedPhoto() {
+    const editedSrc = document.getElementById('photo-modal-img').src;
+    if (!editedSrc || editedSrc === currentEditingPhoto) {
+        showNotification('请先应用效果再保存');
+        return;
+    }
+    
+    const link = document.createElement('a');
+    link.download = `edited-photo-${Date.now()}.jpg`;
+    link.href = editedSrc;
+    link.click();
+    
+    showNotification('照片已保存到本地！');
+}
+
+// 更新照片墙渲染，添加编辑功能
+function renderPhotoWallWithEditor() {
+    const grid = document.getElementById('photo-wall-grid');
+    const allPhotos = [];
+    
+    memories.forEach(m => {
+        if (m.photos) {
+            m.photos.forEach(p => allPhotos.push({ photo: p, date: m.date, content: m.content }));
+        }
+    });
+    
+    if (allPhotos.length === 0) {
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#666;font-size:0.6rem;">还没有照片，快去添加记忆吧！</p>';
+        return;
+    }
+    
+    grid.innerHTML = allPhotos.map(p => {
+        if (p.photo.startsWith('data:video/')) {
+            return `
+                <div class="photo-wall-item">
+                    <video src="${p.photo}" alt="记忆视频" controls></video>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="photo-wall-item" onclick="handlePhotoClick('${p.photo}')">
+                    <img src="${p.photo}" alt="记忆照片">
+                </div>
+            `;
+        }
+    }).join('');
+}
+
+function handlePhotoClick(src) {
+    currentEditingPhoto = src;
+    showPhoto(src);
+}
+
+// 更新showPage函数以支持新页面
+const originalShowPage = showPage;
+showPage = function(pageName) {
+    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+    const target = document.getElementById(pageName + '-page') || document.getElementById('home-page');
+    if (target) {
+        target.classList.add('active');
+        if (pageName === 'calendar') renderCalendar();
+        else if (pageName === 'memories') renderMemories();
+        else if (pageName === 'anniversary') renderAnniversaries();
+        else if (pageName === 'messages') renderMessages();
+        else if (pageName === 'wishlist') renderWishes();
+        else if (pageName === 'mood') renderMoods();
+        else if (pageName === 'photo-wall') renderPhotoWallWithEditor();
+        else if (pageName === 'map') setTimeout(initMap, 100);
+        else if (pageName === 'stats') renderStats();
+        else if (pageName === 'timeline') renderTimeline();
+        else if (pageName === 'annual-report') initAnnualReport();
+        else if (pageName === 'add-memory' && !editingMemoryId) resetMemoryForm();
+        else if (pageName === 'home') {
+            renderCountdown();
+            startLoveTimer();
+        }
+    }
+};

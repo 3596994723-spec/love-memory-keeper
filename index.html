@@ -109,16 +109,34 @@
                     <p>想一起做的事</p>
                 </div>
                 
-                <div class="card" data-page="mood">
-                    <div class="card-icon">💭</div>
-                    <h3>心情打卡</h3>
-                    <p>记录每日心情</p>
-                </div>
-                
                 <div class="card" data-page="messages">
                     <div class="card-icon">💌</div>
                     <h3>甜蜜留言</h3>
                     <p>互相留言表达爱意</p>
+                </div>
+                
+                <div class="card" data-page="memories">
+                    <div class="card-icon">💝</div>
+                    <h3>我的记忆</h3>
+                    <p>查看所有记忆记录</p>
+                </div>
+                
+                <div class="card" data-page="timeline">
+                    <div class="card-icon">📜</div>
+                    <h3>记忆时间轴</h3>
+                    <p>时间线浏览回忆</p>
+                </div>
+                
+                <div class="card" data-page="photo-wall">
+                    <div class="card-icon">📸</div>
+                    <h3>照片墙</h3>
+                    <p>浏览我们的照片</p>
+                </div>
+                
+                <div class="card" data-page="mood">
+                    <div class="card-icon">💭</div>
+                    <h3>心情打卡</h3>
+                    <p>记录每日心情</p>
                 </div>
                 
                 <div class="card" data-page="calendar">
@@ -133,12 +151,6 @@
                     <p>查看我们去过的地方</p>
                 </div>
                 
-                <div class="card" data-page="photo-wall">
-                    <div class="card-icon">📸</div>
-                    <h3>照片墙</h3>
-                    <p>浏览我们的照片</p>
-                </div>
-                
                 <div class="card" data-page="anniversary">
                     <div class="card-icon">💕</div>
                     <h3>纪念日管理</h3>
@@ -151,17 +163,18 @@
                     <p>分析甜蜜瞬间</p>
                 </div>
                 
-                <div class="card" data-page="memories">
-                    <div class="card-icon">💝</div>
-                    <h3>我的记忆</h3>
-                    <p>查看所有记忆记录</p>
+                <div class="card" data-page="annual-report">
+                    <div class="card-icon">📊</div>
+                    <h3>年度报告</h3>
+                    <p>生成年度恋爱总结</p>
                 </div>
                 
                 <div class="card" data-page="stats">
-                    <div class="card-icon">📊</div>
+                    <div class="card-icon">📈</div>
                     <h3>统计分析</h3>
                     <p>记忆数据统计分析</p>
                 </div>
+                
                 <div class="card" data-page="settings">
                     <div class="card-icon">⚙️</div>
                     <h3>设置</h3>
@@ -170,11 +183,47 @@
             </div>
         </main>
         
+        <!-- 记忆时间轴页面 -->
+        <section id="timeline-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>记忆时间轴</h2>
+            <p class="page-hint">沿着时间线回顾我们的美好回忆</p>
+            <div class="timeline-filters">
+                <button class="timeline-filter-btn active" data-filter="all">全部</button>
+                <button class="timeline-filter-btn" data-filter="date">约会</button>
+                <button class="timeline-filter-btn" data-filter="milestone">里程碑</button>
+                <button class="timeline-filter-btn" data-filter="story">故事</button>
+                <button class="timeline-filter-btn" data-filter="travel">旅行</button>
+            </div>
+            <div id="timeline-container" class="timeline-container"></div>
+        </section>
+        
+        <!-- 年度报告页面 -->
+        <section id="annual-report-page" class="page">
+            <button class="back-btn" data-back="home">← 返回主页</button>
+            <h2>年度报告</h2>
+            <p class="page-hint">生成专属的年度恋爱总结</p>
+            <div class="report-year-selector">
+                <label>选择年份：</label>
+                <select id="report-year-select"></select>
+                <button class="btn" id="generate-report-btn">生成报告</button>
+            </div>
+            <div id="annual-report-content" class="annual-report-content"></div>
+            <div id="report-actions" class="report-actions" style="display: none;">
+                <button class="btn" id="export-report-image">📷 导出为图片</button>
+                <button class="btn" id="share-report">📤 分享报告</button>
+            </div>
+        </section>
+        
         <!-- 照片墙页面 -->
         <section id="photo-wall-page" class="page">
             <button class="back-btn" data-back="home">← 返回主页</button>
             <h2>照片墙</h2>
             <p class="page-hint">我们的美好瞬间</p>
+            <div class="photo-wall-toolbar">
+                <button class="btn btn-small" id="photo-filter-btn">🎨 滤镜</button>
+                <button class="btn btn-small" id="photo-edit-btn">✏️ 编辑</button>
+            </div>
             <div id="photo-wall-grid" class="photo-wall-grid"></div>
         </section>
         
@@ -556,9 +605,57 @@
         <div class="modal-content photo-modal-content">
             <button class="modal-close" id="close-photo-modal">×</button>
             <img id="photo-modal-img" src="" alt="照片">
+            <div class="photo-modal-actions" style="text-align:center;margin-top:15px;">
+                <button class="btn btn-small" id="edit-current-photo" style="background:#9b59b6;">✏️ 编辑照片</button>
+            </div>
         </div>
     </div>
     
-    <script src="script.js?v=20260214v17"></script>
+    <!-- 照片编辑弹窗 -->
+    <div id="photo-editor-modal" class="modal" style="display: none;">
+        <div class="modal-content photo-editor-content">
+            <button class="modal-close" id="close-photo-editor">×</button>
+            <h3>📸 照片编辑</h3>
+            <div class="photo-editor-preview">
+                <img id="editor-preview-img" src="" alt="预览">
+            </div>
+            <div class="photo-editor-tools">
+                <div class="editor-tool-group">
+                    <label>滤镜效果</label>
+                    <div class="filter-options">
+                        <button class="filter-btn active" data-filter="none">原图</button>
+                        <button class="filter-btn" data-filter="grayscale">黑白</button>
+                        <button class="filter-btn" data-filter="sepia">复古</button>
+                        <button class="filter-btn" data-filter="warm">暖色</button>
+                        <button class="filter-btn" data-filter="cool">冷色</button>
+                        <button class="filter-btn" data-filter="vintage">怀旧</button>
+                    </div>
+                </div>
+                <div class="editor-tool-group">
+                    <label>亮度: <span id="brightness-value">100</span>%</label>
+                    <input type="range" id="brightness-slider" min="50" max="150" value="100">
+                </div>
+                <div class="editor-tool-group">
+                    <label>对比度: <span id="contrast-value">100</span>%</label>
+                    <input type="range" id="contrast-slider" min="50" max="150" value="100">
+                </div>
+                <div class="editor-tool-group">
+                    <label>饱和度: <span id="saturate-value">100</span>%</label>
+                    <input type="range" id="saturate-slider" min="0" max="200" value="100">
+                </div>
+                <div class="editor-tool-group">
+                    <label>模糊: <span id="blur-value">0</span>px</label>
+                    <input type="range" id="blur-slider" min="0" max="10" value="0">
+                </div>
+            </div>
+            <div class="photo-editor-actions">
+                <button class="btn" id="reset-editor-btn">重置</button>
+                <button class="btn" id="apply-editor-btn" style="background: #27ae60;">应用效果</button>
+                <button class="btn" id="save-edited-photo-btn" style="background: #9b59b6;">保存照片</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js?v=20260216v1"></script>
 </body>
 </html>
